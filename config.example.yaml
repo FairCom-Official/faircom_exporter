@@ -1,0 +1,95 @@
+# FairCom Prometheus Exporter Configuration
+# Complete example with all available options
+
+# ============================================================================
+# Server Configuration
+# ============================================================================
+server:
+  # Port to listen on for metrics scraping
+  port: 9100
+  
+  # Path where metrics are exposed
+  path: /metrics
+  
+  # TLS configuration (optional, recommended for production)
+  # Uncomment to enable HTTPS
+  # tls:
+  #   enabled: true
+  #   cert_file: /etc/faircom_exporter/tls/server.crt
+  #   key_file: /etc/faircom_exporter/tls/server.key
+  
+  # Basic authentication for metrics endpoint (optional)
+  # Protects /metrics from unauthorized access
+  # Uncomment to enable basic auth
+  # basic_auth:
+  #   username: prometheus
+  #   password: changeme
+
+# ============================================================================
+# FairCom Database Connection
+# ============================================================================
+faircom:
+  # FairCom admin credentials
+  username: ADMIN
+  password: ADMIN
+  
+  # Path to ctstat binary (default: /opt/faircom/ctstat)
+  # Adjust if FairCom is installed in a different location
+  ctstat_path: /opt/faircom/ctstat
+  
+  # Command timeout in seconds (default: 10)
+  # Increase if ctstat commands take longer on your system
+  timeout: 10
+
+# ============================================================================
+# Collector Configuration
+# ============================================================================
+# Enable or disable specific metric collectors
+# All collectors are enabled by default
+collectors:
+  # Cache hit/miss percentages (4 metrics)
+  cache: true
+  
+  # Transaction metrics: begins, commits, aborts, timing (11 metrics)
+  transactions: true
+  
+  # Lock metrics: held, hit/miss percentages, deadlocks (4 metrics)
+  locks: true
+  
+  # File metrics: open files, operations (9 metrics)
+  files: true
+  
+  # ISAM operation metrics: adds, deletes, reads, etc. (8 metrics)
+  isam: true
+  
+  # SQL operation metrics: SELECT, INSERT, UPDATE, etc. (6 metrics)
+  sql: true
+  
+  # User statistics: memory, I/O, cache hits (11 metrics)
+  users: true
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+log:
+  # Log level: debug, info, warn, error
+  level: info
+  
+  # Log format: text or json
+  # Use json for structured logging in production
+  format: text
+  
+  # Log file path (default: /var/log/faircom_exporter/faircom_exporter.log)
+  file: /var/log/faircom_exporter/faircom_exporter.log
+  
+  # Maximum size in megabytes before rotation (default: 100)
+  max_size: 100
+  
+  # Maximum number of old log files to keep (default: 3)
+  max_backups: 3
+  
+  # Maximum days to retain old log files (default: 28)
+  max_age: 28
+  
+  # Compress rotated files (default: true)
+  compress: true
