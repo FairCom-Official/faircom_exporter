@@ -198,32 +198,43 @@ server:
   port: 9100                    # Port to listen on
   path: /metrics                # Metrics endpoint path
   
+  # TLS configuration (optional, recommended for production)
+  # tls:
+  #   enabled: true
+  #   cert_file: /etc/faircom_exporter/tls/server.crt
+  #   key_file: /etc/faircom_exporter/tls/server.key
+  
+  # Basic authentication for metrics endpoint (optional)
+  # basic_auth:
+  #   username: prometheus
+  #   password: changeme
+  
 # FairCom database connection
 faircom:
   username: ADMIN               # FairCom admin username
   password: ADMIN               # FairCom admin password
-  ctstat_path: /opt/faircom/ctstat  # Path to ctstat binary
-  timeout: 10                   # Command timeout in seconds
+  ctstat_path: /opt/faircom/ctstat  # Path to ctstat binary (default: /opt/faircom/ctstat)
+  timeout: 10                   # Command timeout in seconds (default: 10)
 
 # Collector toggles (all enabled by default)
 collectors:
-  cache: true                   # Cache hit/miss metrics
-  transactions: true            # Transaction metrics
-  locks: true                   # Lock contention metrics
-  files: true                   # File operation metrics
-  isam: true                    # ISAM operation metrics
-  sql: true                     # SQL operation metrics
-  users: true                   # User statistics
+  cache: true                   # Cache hit/miss metrics (4 metrics)
+  transactions: true            # Transaction metrics (11 metrics)
+  locks: true                   # Lock contention metrics (4 metrics)
+  files: true                   # File operation metrics (9 metrics)
+  isam: true                    # ISAM operation metrics (8 metrics)
+  sql: true                     # SQL operation metrics (6 metrics)
+  users: true                   # User statistics (11 metrics)
 
 # Logging configuration
 log:
   level: info                   # Log level: debug, info, warn, error
   format: text                  # Format: text or json
   file: /var/log/faircom_exporter/faircom_exporter.log
-  max_size: 100                 # Max size in MB before rotation
-  max_backups: 3                # Number of old log files to keep
-  max_age: 28                   # Days to retain old log files
-  compress: true                # Compress rotated files
+  max_size: 100                 # Max size in MB before rotation (default: 100)
+  max_backups: 3                # Number of old log files to keep (default: 3)
+  max_age: 28                   # Days to retain old log files (default: 28)
+  compress: true                # Compress rotated files (default: true)
 ```
 
 ### Production Configuration
