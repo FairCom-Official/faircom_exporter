@@ -1,10 +1,8 @@
 package config
 
 import (
-	"os"
-	"time"
-
 	"gopkg.in/yaml.v3"
+	"os"
 )
 
 // Config holds the exporter configuration
@@ -17,15 +15,16 @@ type Config struct {
 
 // ServerConfig holds HTTP server settings
 type ServerConfig struct {
-	Port      int              `yaml:"port"`
-	Path      string           `yaml:"path"`
-	TLS       *TLSConfig       `yaml:"tls,omitempty"`
-	BasicAuth *BasicAuthConfig `yaml:"basic_auth,omitempty"`
+	Port      int             `yaml:"port"`
+	Path      string          `yaml:"path"`
+	TLS       TLSConfig       `yaml:"tls,omitempty"`
+	BasicAuth BasicAuthConfig `yaml:"basic_auth,omitempty"`
 }
 
 // TLSConfig holds TLS configuration
 type TLSConfig struct {
 	Enabled  bool   `yaml:"enabled"`
+	CAFile   string `yaml:"ca_file"`
 	CertFile string `yaml:"cert_file"`
 	KeyFile  string `yaml:"key_file"`
 }
@@ -38,18 +37,19 @@ type BasicAuthConfig struct {
 
 // FairComConfig holds FairCom connection settings
 type FairComConfig struct {
-	Username   string `yaml:"username"`
-	Password   string `yaml:"password"`
-	CtstatPath string `yaml:"ctstat_path"`
-	Timeout    int    `yaml:"timeout"` // in seconds
+	Servername string          `yaml:"servername"`
+	TLS        TLSConfig       `yaml:"tls"`
+	BasicAuth  BasicAuthConfig `yaml:"basic_auth"`
 }
 
 // CollectorsConfig holds collector enable/disable flags
 type CollectorsConfig struct {
 	Cache        bool `yaml:"cache"`
 	Transactions bool `yaml:"transactions"`
+	CallTime     bool `yaml:"call_timing"`
 	Locks        bool `yaml:"locks"`
 	Files        bool `yaml:"files"`
+	IO           bool `yaml:"io"`
 	ISAM         bool `yaml:"isam"`
 	SQL          bool `yaml:"sql"`
 	Users        bool `yaml:"users"`
@@ -64,14 +64,6 @@ type LogConfig struct {
 	MaxBackups int    `yaml:"max_backups"` // max number of old log files
 	MaxAge     int    `yaml:"max_age"`     // max days to retain old log files
 	Compress   bool   `yaml:"compress"`    // compress rotated files
-}
-
-// GetTimeout returns the timeout as a time.Duration
-func (c *FairComConfig) GetTimeout() time.Duration {
-	if c.Timeout <= 0 {
-		return 10 * time.Second
-	}
-	return time.Duration(c.Timeout) * time.Second
 }
 
 // Load loads configuration from a YAML file
@@ -93,11 +85,8 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.Path == "" {
 		cfg.Server.Path = "/metrics"
 	}
-	if cfg.FairCom.CtstatPath == "" {
-		cfg.FairCom.CtstatPath = "/opt/faircom/ctstat"
-	}
-	if cfg.FairCom.Timeout == 0 {
-		cfg.FairCom.Timeout = 10
+	if cfg.FairCom.Servername == "" {
+		cfg.FairCom.Servername = "FAIRCOMS"
 	}
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
@@ -118,10 +107,11 @@ func Load(path string) (*Config, error) {
 		cfg.Log.MaxAge = 28
 	}
 
-	// Default all collectors to enabled if not specified
-	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions && !cfg.Collectors.Locks &&
-		!cfg.Collectors.Files && !cfg.Collectors.ISAM && !cfg.Collectors.SQL && !cfg.Collectors.Users {
+	// Default collectors to enabled if not specified
+	// CallTimes defaults false
+	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions && !cfg.Collectors.Locks && !cfg.Collectors.IO && !cfg.Collectors.Files && !cfg.Collectors.ISAM && !cfg.Collectors.SQL && !cfg.Collectors.Users {
 		cfg.Collectors.Cache = true
+		cfg.Collectors.IO = true
 		cfg.Collectors.Transactions = true
 		cfg.Collectors.Locks = true
 		cfg.Collectors.Files = true

@@ -1,6 +1,6 @@
 # Server configuration
 server:
-  port: 9100
+  port: 9101
   path: /metrics
   # TLS configuration (optional)
   # tls:
@@ -14,12 +14,18 @@ server:
 
 # FairCom database connection
 faircom:
-  username: ADMIN
-  password: ADMIN
-  # Path to ctstat binary (default: /opt/faircom/ctstat)
-  ctstat_path: /opt/faircom/ctstat
-  # Command timeout in seconds (default: 10)
-  timeout: 10
+  servername: FAIRCOMS@localhost
+  basic_auth:
+      username: ADMIN
+      password: ADMIN
+  #clientside  tls
+  tls:
+    enabled: false
+    # specify PEM formatted certificates and keys
+    #ca_file: /home/user/ourca.crt
+    #cert_file: /home/user/.keys/my.crt
+    #key_file: /home/user/.keys/my.key
+    
 
 # Collector configuration
 collectors:
@@ -30,6 +36,10 @@ collectors:
   isam: true
   sql: true
   users: true
+  io: true
+  # call timing requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB server configuration (in ctsrvr.cfg)
+  call_timing: false
+
 
 # Logging configuration
 log:

@@ -5,7 +5,10 @@ VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_SHA=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.CommitSHA=$(COMMIT_SHA)"
+#DEBUGFLAGS=-gcflags=all="-N -l"
 OUTPUT_DIR=output
+FAIRCOMDB_DIR=/qa/delivery/faircom/FairCom-DB.linux.el7.x64.64bit.v13.0.3.299/drivers/ctree.drivers
+OPENSSL_DIR=${FAIRCOMDB_DIR}/lib/License.Lib/openssl
 PACKAGE_NAME=$(BINARY_NAME)-$(VERSION)
 
 ## help: Display this help message
@@ -17,15 +20,26 @@ help:
 build:
 	CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
 
+
+pkg/collector/snapshot.o: pkg/collector/c/snapshot.c
+	gcc -g -c -fPIC -I${FAIRCOMDB_DIR}/include/unix/multithreaded/dynamic -I${FAIRCOMDB_DIR}/include -I${OPENSSL_DIR}/include -opkg/collector/snapshot.o pkg/collector/c/snapshot.c
+
+pkg/collector/libsnapshot.a: pkg/collector/snapshot.o
+	ar rcs pkg/collector/libsnapshot.a pkg/collector/snapshot.o
+
+build-snapshot: pkg/collector/libsnapshot.a
+	cp $(FAIRCOMDB_DIR)/lib/libmtclient.so pkg/collector/libmtclient.so
+	
+
 ## build-linux-amd64: Build for Linux AMD64
-build-linux-amd64:
+build-linux-amd64: build-snapshot
 	mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/exporter
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/exporter
 
 ## build-linux-arm64: Build for Linux ARM64
-build-linux-arm64:
+build-linux-arm64: build-snapshot
 	mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/exporter
+	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/exporter
 
 ## package-tar: Create tar.gz packages for Linux
 package-tar: build-linux-amd64 build-linux-arm64
@@ -135,6 +149,8 @@ test-coverage:
 clean:
 	go clean
 	rm -rf $(OUTPUT_DIR)
+	rm -f pkg/collector/*.o
+	rm -f pkg/collector/libsnapshot.a
 	rm -f coverage.out coverage.html
 
 ## install: Install the exporter

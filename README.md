@@ -158,10 +158,8 @@ sudo systemctl start faircom_exporter
 ## Building Packages
 
 ```bash
-# Build all package types
-make package-all
 
-# Or build individually
+# Build individually
 make package-tar    # Creates tar.gz archives
 make package-deb    # Creates Debian packages
 make package-rpm    # Creates RPM packages
@@ -171,6 +169,12 @@ Packages are created in the `output/` directory:
 - `output/tar/` - Compressed archives with binary, config, and README
 - `output/deb/` - Debian packages with systemd integration
 - `output/rpm/` - RPM packages with systemd integration
+
+```cmd.exe (Windows)
+# Windows builds require both visual studio and gcc (mingw)
+# 1. Install gcc from the instructions at:  https://www.mingw-w64.org/getting-started/msys2/
+# 2. Check the FAIRCOMDB_DIR and UCRT64 values in Makefile-windows and update as needed.
+# 3. From visual studio x64 command environment, run makewin.bat
 
 ## Configuration
 
@@ -211,19 +215,28 @@ server:
   
 # FairCom database connection
 faircom:
-  username: ADMIN               # FairCom admin username
-  password: ADMIN               # FairCom admin password
-  ctstat_path: /opt/faircom/ctstat  # Path to ctstat binary (default: /opt/faircom/ctstat)
-  timeout: 10                   # Command timeout in seconds (default: 10)
+  # Basic authentication for faircom server
+  basic_auth:
+    username: ADMIN               # FairCom admin username
+    password: ADMIN               # FairCom admin password
+  # 
+  # tls:
+      enabled: true
+      ca_file: /etc/faircom/ca.crt
+  # Client certificate authentication for faircom server
+  #   cert_file: /home/user/faircomuser.crt/
+  #   key_file: /home/user/.keys/faircomuser.key
+  
+
 
 # Collector toggles (all enabled by default)
 collectors:
   cache: true                   # Cache hit/miss metrics (4 metrics)
   transactions: true            # Transaction metrics (11 metrics)
+  io: true                      # IO metrics
   locks: true                   # Lock contention metrics (4 metrics)
   files: true                   # File operation metrics (9 metrics)
   isam: true                    # ISAM operation metrics (8 metrics)
-  sql: true                     # SQL operation metrics (6 metrics)
   users: true                   # User statistics (11 metrics)
 
 # Logging configuration
@@ -256,10 +269,12 @@ server:
     password: your-secure-password
 
 faircom:
-  username: ADMIN
-  password: ADMIN
-  ctstat_path: /opt/faircom/ctstat
-  timeout: 10
+  # Enable TLS client authentication
+  tls: 
+    enabled: true
+    cert_file: /home/user/user.crt
+    key_file: /home/user/.keys/user.key
+    ca_file: /etc/faircom/keys/ca.crt
 
 log:
   level: info
@@ -282,7 +297,6 @@ collectors:
   locks: true          # Keep lock metrics
   files: false         # Disable file metrics
   isam: false          # Disable ISAM metrics
-  sql: false           # Disable SQL metrics
   users: true          # Keep user statistics
 ```
 
@@ -290,24 +304,18 @@ See [config.example.yaml](config.example.yaml) for a complete annotated example.
 
 ## Requirements
 
-- **FairCom Server**: FairCom database with ctstat utility available
-- **ctstat**: Must be accessible (default path: `/opt/faircom/ctstat`, configurable)
+- **FairCom Server**: FairCom database
+- **libmtclient.so**: FairCom client library must be accessible 
 - **Go**: 1.21+ for building from source
+- **Faircom SDK** for building from source
+- **MSYS2 UCRT64** gcc environment for building cgo from source on windows
 - **Credentials**: FairCom admin username and password
 - **Log Directory**: Write access to `/var/log/faircom_exporter/` (auto-created by systemd)
 
 ## Architecture
 
-The exporter uses a multi-report approach:
+The exporter uses a cgo interface and wrapper to the C FairComDB SnapShot API call.
 
-1. **-vas report**: Admin-System metrics (cache, I/O, files, connections, locks, transactions)
-2. **-vat report**: Admin-Transaction metrics (begins, commits, aborts, savepoints, log writes)
-3. **-isam report**: ISAM Activity metrics (adds, deletes, updates, reads, navigation)
-4. **-sql report**: SQL Activity metrics (SELECT, INSERT, UPDATE, DELETE, commits, rollbacks)
-5. **-fileops report**: File Operation metrics (opens, closes, creates, physical I/O)
-6. **-userinfox report**: Extended user statistics (aggregated memory, I/O, cache stats)
-
-Each ctstat command is executed with `-i 1 1 -h 1` flags for single snapshot collection.
 
 ## Prometheus Configuration
 
@@ -458,7 +466,7 @@ make check
 **Connection refused:**
 - Check FairCom server is running
 - Verify username/password in config.yaml
-- Ensure ctstat can connect: `/opt/faircom/ctstat -vas -u ADMIN -p ADMIN -i 1 1`
+- Ensure ctstat can connect: `/usr/bin/faircom/ctstat -vas -u ADMIN -p ADMIN -i 1 1`
 
 **No metrics appearing:**
 - Check exporter logs: `tail -f /var/log/faircom_exporter/faircom_exporter.log`
@@ -466,16 +474,10 @@ make check
 - Verify port 9100 is not blocked by firewall
 - Test endpoint: `curl http://localhost:9100/metrics`
 
-**Timeout errors:**
-- Increase `faircom.timeout` value in config.yaml
-- Default is 10 seconds, try 30 for slower systems
-- Check ctstat performance: `time /opt/faircom/ctstat -vas -u ADMIN -p ADMIN -i 1 1`
-
 **Permission errors:**
 - Ensure exporter has execute permissions
 - For systemd: create `faircom` user: `sudo useradd -r -s /bin/false faircom`
 - Check log directory permissions: `ls -ld /var/log/faircom_exporter`
-- Verify ctstat is executable by the exporter user
 
 **Log rotation not working:**
 - Check log file path in config.yaml
@@ -487,7 +489,6 @@ make check
 - Enable debug logging: set `log.level: debug` in config.yaml
 - Check which collectors are enabled in `collectors` section
 - Disable problematic collectors individually
-- Verify all ctstat reports work: `/opt/faircom/ctstat -vas`, `-vat`, `-isam`, etc.
 
 ## License
 

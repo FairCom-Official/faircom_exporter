@@ -1,348 +1,194 @@
 package collector
 
+// #cgo linux LDFLAGS: -L${SRCDIR} -lsnapshot -lmtclient
+// #cgo windows LDFLAGS: -L${SRCDIR} -lsnapshot -lmtclient
+// #cgo linux CFLAGS: -fPIC
+// #include <stdlib.h>
+// #include <c/snapshot.h>
+//
+import "C"
 import (
-	"context"
-	"os/exec"
-	"strconv"
-	"strings"
-	"time"
+	"fmt"
+	"unsafe"
 )
 
 // SnapshotData holds comprehensive FairCom metrics from multiple ctstat reports
+
 type SnapshotData struct {
-	// From -vas (Admin System) - expanded to capture ALL fields
-	DataCacheHitPct   float64
-	DataCacheMissPct  float64
-	IndexCacheHitPct  float64
-	IndexCacheMissPct float64
-	ReadOpsPerSec     int64
-	WriteOpsPerSec    int64
-	FilesOpen         int64
-	FilesMax          int64
-	UsersActive       int64
-	UsersMax          int64
-	LocksHeld         int64
-	LockHitPct        float64
-	LockMissPct       float64
-	Deadlocks         int64
-	TransActive       int64
-	TransPerSec       int64
-	ReadTranTime      int64
-	WriteTranTime     int64
+	DataCacheHit      uint64
+	DataCacheMiss     uint64
+	IndexCacheHit     uint64
+	IndexCacheMiss    uint64
+	FileReadOps       uint64
+	FileReadBytes     uint64
+	FileWriteOps      uint64
+	FileWriteBytes    uint64
+	CommReadOps       uint64
+	CommReadBytes     uint64
+	CommWriteOps      uint64
+	CommWriteBytes    uint64
+	TranLogReadOps    uint64
+	TranLogReadBytes  uint64
+	TranLogWriteOps   uint64
+	TranLogWriteBytes uint64
 
-	// From -vat (Admin Transaction)
-	TranBegins     int64
-	TranCommits    int64
-	TranAborts     int64
-	TranSavepoints int64
-	TranRestores   int64
-	TranLogWrites  int64
-	TranLogBytes   int64
+	CtreeCallCount uint64
+	CtreeCallTime  uint64
+	CommIdleTime   uint64
+	CommSendTime   uint64
 
-	// From -isam (ISAM Activity)
-	IsamAdds    int64
-	IsamDeletes int64
-	IsamUpdates int64
-	IsamReads   int64
-	IsamFirst   int64
-	IsamLast    int64
-	IsamNext    int64
-	IsamPrev    int64
+	TranBegins           uint64
+	TranCommits          uint64
+	TranAborts           uint64
+	TranSavepoints       uint64
+	TranRestores         uint64
+	TranLogFlush         uint64
+	TotalTransactions    uint64
+	TotalTransactionTime uint64
 
-	// From -sql (SQL Activity)
-	SQLSelects   int64
-	SQLInserts   int64
-	SQLUpdates   int64
-	SQLDeletes   int64
-	SQLCommits   int64
-	SQLRollbacks int64
+	CurrentSystemFilesOpen uint64
+	MaxSystemFilesOpen     uint64
+	CurrentFilesOpen       uint64
+	MaxFilesOpen           uint64
+	UsersActive            uint64
+	MaxUsersActive         uint64
 
-	// From -fileops (File Operations)
-	FileOpens      int64
-	FileCloses     int64
-	FileCreates    int64
-	FileDeletes    int64
-	FileRenames    int64
-	PhysicalReads  int64
-	PhysicalWrites int64
+	CurrentLocksHeld uint64
+	CurrentLockWaits uint64
+	LockHit          uint64
+	LockMiss         uint64
+	LockWaits        uint64
+	Deadlocks        uint64
 
-	// From -userinfox (aggregate across all users)
-	TotalMemoryKB      int64
-	TotalReadOps       int64
-	TotalReadBytes     int64
-	TotalWriteOps      int64
-	TotalWriteBytes    int64
-	TotalDataRequests  int64
-	TotalDataHits      int64
-	TotalIndexRequests int64
-	TotalIndexHits     int64
-	TotalActiveUsers   int64
-	TotalIdleUsers     int64
+	IsamAdds    uint64
+	IsamDeletes uint64
+	IsamUpdates uint64
+	IsamReads   uint64
+
+	SystemFileOpens  uint64
+	SystemFileCloses uint64
+	FileOpens        uint64
+	FileCloses       uint64
+	FileCreates      uint64
+	FileRenames      uint64
+	FileDeletes      uint64
+	TotalMemory      uint64
 }
 
-// GetSnapshot retrieves comprehensive metrics using multiple ctstat reports
-func GetSnapshot(username, password, ctstatPath string, timeout time.Duration) (*SnapshotData, error) {
+// initSnapshot initializes the faircomDB connection by calling the C function. Returns 0 on error, or owner on success
+func initSnapshot(servername, username, password, clientcert, clientkey, passphrase, cafile string) (int, error) {
+	// treat these empty go strings as C NULL values
+	var cert *C.char
+	if clientcert != "" {
+		cert = C.CString(clientcert)
+		defer C.free(unsafe.Pointer(cert))
+	}
+	var key *C.char
+	if clientkey != "" {
+		key = C.CString(clientkey)
+		defer C.free(unsafe.Pointer(key))
+	}
+	var phrase *C.char
+	if passphrase != "" {
+		phrase = C.CString(passphrase)
+		defer C.free(unsafe.Pointer(phrase))
+	}
+	var ca *C.char
+	if cafile != "" {
+		ca = C.CString(cafile)
+		defer C.free(unsafe.Pointer(ca))
+	}
+	server := C.CString(servername)
+	user := C.CString(username)
+	pw := C.CString(password)
+	defer C.free(unsafe.Pointer(server))
+	defer C.free(unsafe.Pointer(user))
+	defer C.free(unsafe.Pointer(pw))
+	ret := C.InitSnapshot(server, user, pw, cert, key, phrase, ca)
+	if ret != 0 {
+		return 0, fmt.Errorf("FaircomDB error %d", ret)
+	}
+	return int(C.ctOWNER()), nil
+}
+
+// termSnapshot terminates and cleans up the faircomDb connection by calling the C function
+func termSnapshot(owner int) {
+	cowner := C.int(owner)
+	C.ctSetOWNER(cowner)
+	C.TermSnapshot()
+}
+
+// GetSnapshot retrieves comprehensive metrics using Snapshot call.
+func GetSnapshot(owner int) (*SnapshotData, error) {
 	data := &SnapshotData{}
-
-	// Get -vas (Admin System Report) - single snapshot
-	vas, err := runCtstat("-vas", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseVas(vas, data)
+	Cdata := C.struct_SnapshotDataC{}
+	// set the current owner
+	cowner := C.int(owner)
+	C.ctSetOWNER(cowner)
+	// Call the C function to populate the C struct with all metrics.
+	// NOTE: This is a small subset of available C metrics.
+	ret := C.GetSnapshotData(&Cdata, C.size_t(unsafe.Sizeof(Cdata)))
+	if ret != 0 {
+		return nil, fmt.Errorf("failed to get snapshot data: %d", ret)
 	}
 
-	// Get -vat (Admin Transaction Report) - single snapshot
-	vat, err := runCtstat("-vat", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseVat(vat, data)
-	}
+	// Map the C struct fields to the Go struct
+	data.DataCacheHit = uint64(Cdata.DataCacheHit)
+	data.DataCacheMiss = uint64(Cdata.DataCacheMiss)
+	data.IndexCacheHit = uint64(Cdata.IndexCacheHit)
+	data.IndexCacheMiss = uint64(Cdata.IndexCacheMiss)
+	data.FileReadOps = uint64(Cdata.FileReadOps)
+	data.FileReadBytes = uint64(Cdata.FileReadBytes)
+	data.FileWriteOps = uint64(Cdata.FileWriteOps)
+	data.FileWriteBytes = uint64(Cdata.FileWriteBytes)
+	data.CommReadOps = uint64(Cdata.CommReadOps)
+	data.CommReadBytes = uint64(Cdata.CommReadBytes)
+	data.CommWriteOps = uint64(Cdata.CommWriteOps)
+	data.CommWriteBytes = uint64(Cdata.CommWriteBytes)
+	data.TranLogReadOps = uint64(Cdata.TranLogReadOps)
+	data.TranLogReadBytes = uint64(Cdata.TranLogReadBytes)
+	data.TranLogWriteOps = uint64(Cdata.TranLogWriteOps)
+	data.TranLogWriteBytes = uint64(Cdata.TranLogWriteBytes)
 
-	// Get -isam (ISAM Activity Report) - single snapshot
-	isam, err := runCtstat("-isam", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseIsam(isam, data)
-	}
+	data.CtreeCallCount = uint64(Cdata.CtreeCallCount)
+	data.CtreeCallTime = uint64(Cdata.CtreeCallTime)
+	data.CommIdleTime = uint64(Cdata.CommIdleTime)
+	data.CommSendTime = uint64(Cdata.CommSendTime)
 
-	// Get -sql (SQL Activity Report) - single snapshot
-	sql, err := runCtstat("-sql", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseSQL(sql, data)
-	}
+	data.TranBegins = uint64(Cdata.TranBegins)
+	data.TranCommits = uint64(Cdata.TranCommits)
+	data.TranAborts = uint64(Cdata.TranAborts)
+	data.TranSavepoints = uint64(Cdata.TranSavepoints)
+	data.TranRestores = uint64(Cdata.TranRestores)
+	data.TranLogFlush = uint64(Cdata.TranLogFlush)
+	data.TotalTransactions = uint64(Cdata.TotalTransactions)
+	data.TotalTransactionTime = uint64(Cdata.TotalTransactionTime)
 
-	// Get -fileops (File Operations Report) - single snapshot
-	fileops, err := runCtstat("-fileops", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseFileops(fileops, data)
-	}
+	data.CurrentSystemFilesOpen = uint64(Cdata.CurrentSystemFilesOpen)
+	data.MaxSystemFilesOpen = uint64(Cdata.MaxSystemFilesOpen)
+	data.CurrentFilesOpen = uint64(Cdata.CurrentFilesOpen)
+	data.MaxFilesOpen = uint64(Cdata.MaxFilesOpen)
+	data.UsersActive = uint64(Cdata.UsersActive)
+	data.MaxUsersActive = uint64(Cdata.MaxUsersActive)
 
-	// Get -userinfox (Extended User Report) - single snapshot to aggregate user metrics
-	userinfox, err := runCtstat("-userinfox", username, password, ctstatPath, timeout, true)
-	if err == nil {
-		parseUserinfox(userinfox, data)
-	}
+	data.CurrentLocksHeld = uint64(Cdata.CurrentLocksHeld)
+	data.LockHit = uint64(Cdata.LockHit)
+	data.LockMiss = uint64(Cdata.LockMiss)
+	data.LockWaits = uint64(Cdata.LockWaits)
+	data.Deadlocks = uint64(Cdata.Deadlocks)
+
+	data.IsamAdds = uint64(Cdata.IsamAdds)
+	data.IsamDeletes = uint64(Cdata.IsamDeletes)
+	data.IsamUpdates = uint64(Cdata.IsamUpdates)
+	data.IsamReads = uint64(Cdata.IsamReads)
+
+	data.SystemFileOpens = uint64(Cdata.SystemFileOpens)
+	data.FileOpens = uint64(Cdata.FileOpens)
+	data.FileCloses = uint64(Cdata.FileCloses)
+	data.FileCreates = uint64(Cdata.FileCreates)
+	data.FileRenames = uint64(Cdata.FileRenames)
+	data.FileDeletes = uint64(Cdata.FileDeletes)
+	data.TotalMemory = uint64(Cdata.TotalMemory)
 
 	return data, nil
-}
-
-// runCtstat executes ctstat command with timeout
-func runCtstat(report, username, password, ctstatPath string, timeout time.Duration, singleSnapshot bool) (string, error) {
-	args := []string{report, "-u", username, "-p", password}
-	if singleSnapshot {
-		args = append(args, "-i", "1", "1", "-h", "1")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, ctstatPath, args...)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
-}
-
-// parseVas parses -vas (Admin System Report)
-// Format:      cache     disk i/o   files   connect        locks         transactions
-//
-//	d%h %m i%h %m  r/s  w/s  cur/max  cur/max   cur l%h %m  dead act t/s  r/t  w/t
-func parseVas(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-	if len(lines) < 3 {
-		return
-	}
-
-	dataLine := getLastNonEmptyLine(lines)
-	fields := strings.Fields(dataLine)
-	if len(fields) < 13 {
-		return
-	}
-
-	// Cache stats - capture hit AND miss percentages
-	data.DataCacheHitPct = parseFloat(fields[0])
-	data.DataCacheMissPct = parseFloat(fields[1])
-	data.IndexCacheHitPct = parseFloat(fields[2])
-	data.IndexCacheMissPct = parseFloat(fields[3])
-
-	// Disk I/O
-	data.ReadOpsPerSec = parseInt(fields[4])
-	data.WriteOpsPerSec = parseInt(fields[5])
-
-	// Parse files: cur/max
-	filesParts := strings.Split(fields[6], "/")
-	if len(filesParts) == 2 {
-		data.FilesOpen = parseInt(filesParts[0])
-		data.FilesMax = parseInt(filesParts[1])
-	}
-
-	// Parse connections: cur/max
-	connParts := strings.Split(fields[7], "/")
-	if len(connParts) == 2 {
-		data.UsersActive = parseInt(connParts[0])
-		data.UsersMax = parseInt(connParts[1])
-	}
-
-	// Lock stats - capture hit AND miss percentages
-	data.LocksHeld = parseInt(fields[8])
-	data.LockHitPct = parseFloat(fields[9])
-	data.LockMissPct = parseFloat(fields[10])
-	data.Deadlocks = parseInt(fields[11])
-
-	// Transaction stats
-	data.TransActive = parseInt(fields[12])
-	if len(fields) > 13 {
-		data.TransPerSec = parseInt(fields[13])
-	}
-	if len(fields) > 14 {
-		data.ReadTranTime = parseInt(fields[14])
-	}
-	if len(fields) > 15 {
-		data.WriteTranTime = parseInt(fields[15])
-	}
-}
-
-// parseVat parses -vat (Admin Transaction Report)
-func parseVat(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-	dataLine := getLastNonEmptyLine(lines)
-	fields := strings.Fields(dataLine)
-
-	if len(fields) >= 6 {
-		data.TranBegins = parseInt(fields[0])
-		data.TranCommits = parseInt(fields[1])
-		data.TranAborts = parseInt(fields[2])
-		data.TranSavepoints = parseInt(fields[3])
-		data.TranRestores = parseInt(fields[4])
-	}
-	if len(fields) >= 8 {
-		data.TranLogWrites = parseInt(fields[6])
-		data.TranLogBytes = parseInt(fields[7])
-	}
-}
-
-// parseIsam parses -isam (ISAM Activity Report)
-func parseIsam(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-	dataLine := getLastNonEmptyLine(lines)
-	fields := strings.Fields(dataLine)
-
-	if len(fields) >= 8 {
-		data.IsamAdds = parseInt(fields[0])
-		data.IsamDeletes = parseInt(fields[1])
-		data.IsamUpdates = parseInt(fields[2])
-		data.IsamReads = parseInt(fields[3])
-		data.IsamFirst = parseInt(fields[4])
-		data.IsamLast = parseInt(fields[5])
-		data.IsamNext = parseInt(fields[6])
-		data.IsamPrev = parseInt(fields[7])
-	}
-}
-
-// parseSQL parses -sql (SQL Activity Report)
-func parseSQL(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-	dataLine := getLastNonEmptyLine(lines)
-	fields := strings.Fields(dataLine)
-
-	if len(fields) >= 6 {
-		data.SQLSelects = parseInt(fields[0])
-		data.SQLInserts = parseInt(fields[1])
-		data.SQLUpdates = parseInt(fields[2])
-		data.SQLDeletes = parseInt(fields[3])
-		data.SQLCommits = parseInt(fields[4])
-		data.SQLRollbacks = parseInt(fields[5])
-	}
-}
-
-// parseFileops parses -fileops (File Operations Report)
-func parseFileops(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-	dataLine := getLastNonEmptyLine(lines)
-	fields := strings.Fields(dataLine)
-
-	if len(fields) >= 7 {
-		data.FileOpens = parseInt(fields[0])
-		data.FileCloses = parseInt(fields[1])
-		data.FileCreates = parseInt(fields[2])
-		data.FileDeletes = parseInt(fields[3])
-		data.FileRenames = parseInt(fields[4])
-		data.PhysicalReads = parseInt(fields[5])
-		data.PhysicalWrites = parseInt(fields[6])
-	}
-}
-
-// parseUserinfox parses -userinfox (Extended User Report) and aggregates across all users
-// Format: status lastrequest trntime mem fils time uid/tid/nodename commprotocol readops readbytes writeops writebytes datarqsts datahits indexrqsts indexhits
-func parseUserinfox(output string, data *SnapshotData) {
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
-		fields := strings.Fields(line)
-
-		// Skip headers and lines without enough fields
-		if len(fields) < 18 || fields[0] == "status" {
-			continue
-		}
-
-		// fields[0] = status (idle/busy)
-		// fields[3] = mem (e.g., "137K")
-		// fields[8] = readops
-		// fields[9] = readbytes
-		// fields[10] = writeops
-		// fields[11] = writebytes
-		// fields[12] = datarqsts
-		// fields[13] = datahits
-		// fields[14] = indexrqsts
-		// fields[15] = indexhits
-
-		// Track active vs idle users
-		if fields[0] == "busy" {
-			data.TotalActiveUsers++
-		} else if fields[0] == "idle" {
-			data.TotalIdleUsers++
-		}
-
-		// Aggregate memory (parse KB value like "137K")
-		memStr := fields[3]
-		if strings.HasSuffix(memStr, "K") {
-			memKB := parseInt(strings.TrimSuffix(memStr, "K"))
-			data.TotalMemoryKB += memKB
-		}
-
-		// Aggregate I/O operations
-		data.TotalReadOps += parseInt(fields[8])
-		data.TotalReadBytes += parseInt(fields[9])
-		data.TotalWriteOps += parseInt(fields[10])
-		data.TotalWriteBytes += parseInt(fields[11])
-
-		// Aggregate cache statistics
-		data.TotalDataRequests += parseInt(fields[12])
-		data.TotalDataHits += parseInt(fields[13])
-		data.TotalIndexRequests += parseInt(fields[14])
-		data.TotalIndexHits += parseInt(fields[15])
-	}
-}
-
-// Helper functions
-func getLastNonEmptyLine(lines []string) string {
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line != "" && !strings.HasPrefix(line, "-") && !strings.Contains(line, "cache") {
-			return line
-		}
-	}
-	return ""
-}
-
-func parseInt(s string) int64 {
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.TrimSpace(s)
-	val, _ := strconv.ParseInt(s, 10, 64)
-	return val
-}
-
-func parseFloat(s string) float64 {
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.TrimSpace(s)
-	val, _ := strconv.ParseFloat(s, 64)
-	return val
 }

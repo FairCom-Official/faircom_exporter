@@ -97,7 +97,7 @@ func main() {
 
 	// Create single FairCom collector
 	logger.Info("Initializing FairCom metrics collector...")
-	faircomCollector := collector.NewFairComCollector(cfg.FairCom)
+	faircomCollector := collector.NewFairComCollector(cfg)
 
 	// Register collector with Prometheus
 	prometheus.MustRegister(faircomCollector)
