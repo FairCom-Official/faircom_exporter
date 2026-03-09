@@ -415,12 +415,14 @@ faircom_file_opens_total 4310
 ├── cmd/exporter/          # Application entry point
 ├── pkg/
 │   ├── collector/         # Metrics collection logic
+|   |   |-- c/            # cgo c interface
 │   └── config/           # Configuration handling
 ├── systemd/              # Systemd service file
 ├── output/               # Build artifacts (gitignored)
 │   ├── deb/
 │   ├── rpm/
 │   └── tar/
+|   |-- zip/
 ├── config.yaml           # Example configuration
 ├── config.example.yaml   # Complete annotated example
 ├── Makefile             # Build automation
