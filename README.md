@@ -7,7 +7,7 @@ Prometheus exporter for FairCom database that collects comprehensive performance
 - **SnapShot Integration**: Uses cgo interface for reliable data collection
 - **Configurable Collectors**: Enable/disable specific metric groups
 - **Structured Logging**: JSON or text format with automatic log rotation
-- **Production Ready**: TLS support, basic auth, systemd integration
+- **Production Ready**: TLS support with optional client auth, basic auth, systemd integration
 - **Real-time Data**: Direct access to live server statistics
 
 ## Metrics Collected
@@ -168,7 +168,7 @@ Packages are created in the `output/` directory:
 # Windows builds require both visual studio and gcc (mingw)
 # 1. Install gcc from the instructions at:  https://www.mingw-w64.org/getting-started/msys2/
 # 2. Check the FAIRCOMDB_DIR and UCRT64 values in Makefile-windows and update as needed.
-# 3. From visual studio x64 command environment, run makewin.bat
+# 3. From a visual studio x64 command environment, run makewin.bat
 
 ## Configuration
 
@@ -216,8 +216,8 @@ faircom:
   # optional TLS communication
   # tls:
   #    enabled: true
-  #    ca_file: /etc/faircom/ca.crt
-  # Client certificate authentication for faircom server
+  #    ca_file: /etc/faircom_exporter/tls/ca.crt
+  # Client certificate authentication for faircom server (recommended for production)
   #   cert_file: /etc/faircom_exporter/tls/user.crt
   #   key_file: /etc/faircom_exporter/tls/user.key
   
@@ -267,7 +267,7 @@ faircom:
   # Enable faircomDB TLS client authentication
   tls: 
     enabled: true
-    ca_file: /etc/faircom/tls/ca.crt
+    ca_file: /etc/faircom_exporter/tls/ca.crt
     cert_file: /etc/faircom_exporter/tls/user.crt
     key_file: /etc/faircom_exporter/tls/user.key
 
@@ -449,6 +449,17 @@ make fmt
 
 # Run all checks
 make check
+```
+
+```cmd.exe
+# Clean build artifacts
+makewin clean
+
+# Build for x64
+makewin
+
+# Build zip package
+makewin package-zip
 ```
 
 ## Troubleshooting

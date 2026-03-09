@@ -50,8 +50,8 @@ faircom:
      enabled:false
      ca_file: /etc/faircom_exporter/tls/ca.crt
   # client certificate authentcation (optional, replaces username & password)
-  #  cert_file: /home/user/.keys/user.crt
-  #  key_file: /home/user/.keys/user.key
+  #cert_file: /etc/faircom_exporter/tls/user.crt
+  #key_file: /etc/faircom_exporter/tls/user.key
   
   
 
@@ -74,14 +74,11 @@ collectors:
   # Lock metrics: held, hit/miss counts, deadlocks (6 metrics)
   locks: true
  
-  # File metrics: open files, operations (11 metrics)
+  # File metrics: open files, operations (9 metrics)
   files: true
   
   # ISAM operation metrics: adds, deletes, reads (4 metrics)
   isam: true
-  
-  # SQL operation metrics: SELECT, INSERT, UPDATE, etc. (6 metrics)
-  sql: true
   
   # User connection counts (2 metrics)
   users: true
