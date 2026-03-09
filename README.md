@@ -1,38 +1,35 @@
 # FairCom Prometheus Exporter
 
-Prometheus exporter for FairCom database that collects comprehensive performance metrics using the `ctstat` utility.
+Prometheus exporter for FairCom database that collects comprehensive performance metrics using the `SnapShot` api.
 
 ## Features
-
-- **Comprehensive Metrics**: 58 metrics covering all aspects of FairCom server operation
-- **ctstat Integration**: Uses native FairCom ctstat utility for reliable data collection
-- **Zero CGO Dependencies**: Pure Go implementation with subprocess calls
+- **Comprehensive Metrics**: 51 metrics covering all aspects of FairCom server operation
+- **SnapShot Integration**: Uses cgo interface for reliable data collection
 - **Configurable Collectors**: Enable/disable specific metric groups
 - **Structured Logging**: JSON or text format with automatic log rotation
 - **Production Ready**: TLS support, basic auth, systemd integration
 - **Real-time Data**: Direct access to live server statistics
-- **Multiple Report Types**: Aggregates data from 6 different ctstat reports
 
 ## Metrics Collected
 
 ### Cache Statistics (4 metrics)
-- Data cache hit/miss percentages
-- Index cache hit/miss percentages
+- Data cache hit/miss counts
+- Index cache hit/miss counts
 
-### I/O Statistics (2 metrics)
-- Read operations per second
-- Write operations per second
+### I/O Statistics (12 metrics)
+- Read & Write ops (file/ipc/transaction logs)
+- Read & Write bytes (file/ipc/transaction logs)
 
-### Transaction Metrics (11 metrics)
+### Transaction Metrics (8 metrics)
 - Transaction begins/commits/aborts
 - Savepoints and restores
 - Transaction log writes and bytes
 - Active transactions and throughput
-- Read/write transaction timing
 
-### Lock Statistics (4 metrics)
+### Lock Statistics (6 metrics)
 - Locks currently held
-- Lock hit/miss percentages
+- Locks currently waiting
+- Lock hit/miss/wait counts
 - Deadlock count
 
 ### Connection Metrics (2 metrics)
@@ -43,19 +40,16 @@ Prometheus exporter for FairCom database that collects comprehensive performance
 - File operations (opens/closes/creates/deletes/renames)
 - Physical read/write operations
 
-### ISAM Operations (8 metrics)
+### ISAM Operations (4 metrics)
 - Record adds/deletes/updates/reads
-- First/last/next/previous operations
 
-### SQL Operations (6 metrics)
-- SELECT/INSERT/UPDATE/DELETE statements
-- COMMIT/ROLLBACK operations
+### User Statistics (2 metrics)
+- curent and maximum user counts
 
-### User Statistics (10 metrics)
-- Total memory usage across all users
-- Active vs idle user counts
-- Aggregated I/O operations and bytes
-- Data and index buffer requests/hits
+### Call Timing (4 metrics)
+- ipc call counts
+- ipc call, idle, and response times
+
 
 ## Quick Start
 
@@ -219,25 +213,26 @@ faircom:
   basic_auth:
     username: ADMIN               # FairCom admin username
     password: ADMIN               # FairCom admin password
-  # 
+  # optional TLS communication
   # tls:
-      enabled: true
-      ca_file: /etc/faircom/ca.crt
+  #    enabled: true
+  #    ca_file: /etc/faircom/ca.crt
   # Client certificate authentication for faircom server
-  #   cert_file: /home/user/faircomuser.crt/
-  #   key_file: /home/user/.keys/faircomuser.key
+  #   cert_file: /etc/faircom_exporter/tls/user.crt
+  #   key_file: /etc/faircom_exporter/tls/user.key
   
 
 
-# Collector toggles (all enabled by default)
+# Collector toggles (most enabled by default)
 collectors:
   cache: true                   # Cache hit/miss metrics (4 metrics)
-  transactions: true            # Transaction metrics (11 metrics)
-  io: true                      # IO metrics
-  locks: true                   # Lock contention metrics (4 metrics)
-  files: true                   # File operation metrics (9 metrics)
-  isam: true                    # ISAM operation metrics (8 metrics)
-  users: true                   # User statistics (11 metrics)
+  transactions: true            # Transaction metrics (8 metrics)
+  io: true                      # IO metrics (12 metrics)
+  locks: true                   # Lock contention metrics (6 metrics)
+  files: true                   # File operation metrics (11 metrics)
+  isam: true                    # ISAM operation metrics (4 metrics)
+  users: true                   # User statistics (2 metrics)
+  call_time: false              # server call times.  (4 metrics) Requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB
 
 # Logging configuration
 log:
@@ -269,12 +264,12 @@ server:
     password: your-secure-password
 
 faircom:
-  # Enable TLS client authentication
+  # Enable faircomDB TLS client authentication
   tls: 
     enabled: true
-    cert_file: /home/user/user.crt
-    key_file: /home/user/.keys/user.key
-    ca_file: /etc/faircom/keys/ca.crt
+    ca_file: /etc/faircom/tls/ca.crt
+    cert_file: /etc/faircom_exporter/tls/user.crt
+    key_file: /etc/faircom_exporter/tls/user.key
 
 log:
   level: info
@@ -392,25 +387,24 @@ docker exec faircom-edge tail -f /var/log/faircom_exporter/faircom_exporter.log
 
 ```prometheus
 # Cache performance
-faircom_cache_hit_percent{type="data"} 98
-faircom_cache_miss_percent{type="data"} 2
+faircom_cache_hit{type="data"} 473550
+faircom_cache_miss{type="data"} 3364
 
 # Transaction throughput
-faircom_transactions_per_sec 150
-faircom_transaction_commits_total 1234567
+faircom_transaction_commits_total 1036
+faircom_transaction_begins_total1036
 
 # Lock contention
-faircom_lock_hit_percent 100
+faircom_lock_hit_total 9180
+faircom_lock_miss_total 0
 faircom_deadlocks_total 0
+faircom_lock_wait_current 0
+faircom_lock_wait_total 12
 
-# SQL operations
-faircom_sql_selects_total 45678
-faircom_sql_inserts_total 12345
-
-# User statistics
-faircom_total_memory_kb 4096
-faircom_total_active_users 5
-faircom_total_read_bytes 1048576
+# file statistics
+faircom_files_open_current 49 
+faircom_files_open_max 70
+faircom_file_opens_total 4310
 ```
 
 ## Development
@@ -457,10 +451,9 @@ make check
 
 ## Troubleshooting
 
-**ctstat not found:**
-- Ensure ctstat binary is available at the configured path (default: `/opt/faircom/ctstat`)
-- Update `faircom.ctstat_path` in config.yaml if installed elsewhere
-- Check executable permissions: `chmod +x /opt/faircom/ctstat`
+**libmtclient.so not found:**
+- Ensure libmtclient.so binary is available at the expected path (`/usr/lib64/faircom/`)
+- Check executable permissions: `chmod +x /usr/lib64/faircom/libmclient.so`
 - Verify FairCom SDK is properly installed
 
 **Connection refused:**
