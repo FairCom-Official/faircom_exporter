@@ -31,16 +31,7 @@ server:
 faircom:
   # Faircom server
   servername: FAIRCOMS@localhost
-  # TLS configuration (optional, recommended for production)
-  # Uncomment to enable HTTPS
-  # tls:
-  #   enabled: true
-  #   cert_file: /etc/faircom_exporter/tls/server.crt
-  #   key_file: /etc/faircom_exporter/tls/server.key
-  
-  # Basic authentication for metrics endpoint (optional)
-  # Protects /metrics from unauthorized access
-  # 
+  # Basic authentication for faircom 
   basic_auth:
      username: ADMIN
      password: ADMIN
