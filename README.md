@@ -44,7 +44,7 @@ Prometheus exporter for FairCom database that collects comprehensive performance
 - Record adds/deletes/updates/reads
 
 ### User Statistics (2 metrics)
-- curent and maximum user counts
+- current and maximum user counts
 
 ### Call Timing (4 metrics)
 - ipc call counts
@@ -301,7 +301,7 @@ See [config.example.yaml](config.example.yaml) for a complete annotated example.
 
 - **FairCom Server**: FairCom database
 - **libmtclient.so**: FairCom client library must be accessible 
-- **Go**: 1.21+ for building from source
+- **Go**: 1.24+ for building from source
 - **Faircom SDK** for building from source
 - **MSYS2 UCRT64** gcc environment for building cgo from source on windows
 - **Credentials**: FairCom admin username and password

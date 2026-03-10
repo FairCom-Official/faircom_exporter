@@ -172,6 +172,7 @@ func GetSnapshot(owner int) (*SnapshotData, error) {
 	data.MaxUsersActive = uint64(Cdata.MaxUsersActive)
 
 	data.CurrentLocksHeld = uint64(Cdata.CurrentLocksHeld)
+	data.CurrentLockWaits = uint64(Cdata.CurrentLockWaits)
 	data.LockHit = uint64(Cdata.LockHit)
 	data.LockMiss = uint64(Cdata.LockMiss)
 	data.LockWaits = uint64(Cdata.LockWaits)
@@ -183,6 +184,7 @@ func GetSnapshot(owner int) (*SnapshotData, error) {
 	data.IsamReads = uint64(Cdata.IsamReads)
 
 	data.SystemFileOpens = uint64(Cdata.SystemFileOpens)
+	data.SystemFileCloses = uint64(Cdata.SystemFileCloses)
 	data.FileOpens = uint64(Cdata.FileOpens)
 	data.FileCloses = uint64(Cdata.FileCloses)
 	data.FileCreates = uint64(Cdata.FileCreates)

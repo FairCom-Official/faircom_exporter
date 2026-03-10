@@ -51,7 +51,6 @@ type CollectorsConfig struct {
 	Files        bool `yaml:"files"`
 	IO           bool `yaml:"io"`
 	ISAM         bool `yaml:"isam"`
-	SQL          bool `yaml:"sql"`
 	Users        bool `yaml:"users"`
 }
 
@@ -109,14 +108,13 @@ func Load(path string) (*Config, error) {
 
 	// Default collectors to enabled if not specified
 	// CallTimes defaults false
-	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions && !cfg.Collectors.Locks && !cfg.Collectors.IO && !cfg.Collectors.Files && !cfg.Collectors.ISAM && !cfg.Collectors.SQL && !cfg.Collectors.Users {
+	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions && !cfg.Collectors.Locks && !cfg.Collectors.IO && !cfg.Collectors.Files && !cfg.Collectors.ISAM && !cfg.Collectors.Users {
 		cfg.Collectors.Cache = true
 		cfg.Collectors.IO = true
 		cfg.Collectors.Transactions = true
 		cfg.Collectors.Locks = true
 		cfg.Collectors.Files = true
 		cfg.Collectors.ISAM = true
-		cfg.Collectors.SQL = true
 		cfg.Collectors.Users = true
 	}
 

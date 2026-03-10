@@ -38,9 +38,9 @@ faircom:
 
   # clientside TLS configuration (optional, recommended for production)
   tls:
-     enabled:false
+     enabled: false
      ca_file: /etc/faircom_exporter/tls/ca.crt
-  # client certificate authentcation (optional, replaces username & password)
+  # client certificate authentication (optional, replaces username & password)
   #cert_file: /etc/faircom_exporter/tls/user.crt
   #key_file: /etc/faircom_exporter/tls/user.key
   
@@ -75,7 +75,7 @@ collectors:
   users: true
 
   # call timings for isam ipc calls. (4 metrics) Requires server configuration DIAGNOSTICS SNAPSHOT_WORKTIME in ctsrvr.cfg:
-  call_timings: true
+  call_timing: true
 
 # ============================================================================
 # Logging Configuration

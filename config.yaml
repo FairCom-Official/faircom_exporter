@@ -23,7 +23,7 @@ faircom:
   tls:
     enabled: false
     ca_file: /etc/faircom_exporter/tls/ca.crt
-  # client certificate authentcation (optional, replaces username & password)
+  # client certificate authentication (optional, replaces username & password)
     #cert_file: /etc/faircom_exporter/tls/user.crt
     #key_file: /etc/faircom_exporter/tls/user.key
     

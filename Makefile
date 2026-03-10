@@ -10,7 +10,6 @@ LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIM
 #DEBUGFLAGS=-gcflags=all="-N -l"
 OUTPUT_DIR=output
 FAIRCOMDB_DIR=/opt/faircom/drivers/ctree.drivers
-FAIRCOMDB_DIR=/qa/delivery/faircom/FairCom-DB.linux.el7.x64.64bit.v13.0.3.299/drivers/ctree.drivers
 OPENSSL_DIR=${FAIRCOMDB_DIR}/lib/License.Lib/openssl
 PACKAGE_NAME_BASE=$(BINARY_BASENAME)-$(VERSION)
 PACKAGE_NAME=$(PACKAGE_NAME_BASE)-linux-$(BUILD_ARCH)

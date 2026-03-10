@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 // SnapshotData holds comprehensive FairCom metrics from multiple snapshot reports
 struct SnapshotDataC {
