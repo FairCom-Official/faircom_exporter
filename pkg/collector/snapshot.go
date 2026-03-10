@@ -1,6 +1,6 @@
 package collector
 
-// #cgo linux LDFLAGS: -L${SRCDIR} -lsnapshot -lmtclient
+// #cgo linux LDFLAGS: -L${SRCDIR} -lsnapshot -L/usr/lib64/faircom -Wl,-rpath,/usr/lib64/faircom -lmtclient
 // #cgo windows LDFLAGS: -L${SRCDIR} -lsnapshot -lmtclient
 // #cgo linux CFLAGS: -fPIC
 // #include <stdlib.h>

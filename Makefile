@@ -1,15 +1,19 @@
 .PHONY: build run test clean install lint fmt vet check deps help package-all package-tar package-rpm package-deb
 
-BINARY_NAME=faircom_exporter
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_SHA=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_ARCH=$(shell uname -m)
+BINARY_BASENAME=faircom_exporter
+BINARY_NAME=$(BINARY_BASENAME)
 LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.CommitSHA=$(COMMIT_SHA)"
 #DEBUGFLAGS=-gcflags=all="-N -l"
 OUTPUT_DIR=output
+FAIRCOMDB_DIR=/opt/faircom/drivers/ctree.drivers
 FAIRCOMDB_DIR=/qa/delivery/faircom/FairCom-DB.linux.el7.x64.64bit.v13.0.3.299/drivers/ctree.drivers
 OPENSSL_DIR=${FAIRCOMDB_DIR}/lib/License.Lib/openssl
-PACKAGE_NAME=$(BINARY_NAME)-$(VERSION)
+PACKAGE_NAME_BASE=$(BINARY_BASENAME)-$(VERSION)
+PACKAGE_NAME=$(PACKAGE_NAME_BASE)-linux-$(BUILD_ARCH)
 
 ## help: Display this help message
 help:
@@ -17,8 +21,8 @@ help:
 	@awk '/^##/ {printf "\033[36m%-20s\033[0m %s\n", $$2, substr($$0, index($$0, $$3))}' $(MAKEFILE_LIST)
 
 ## build: Build the exporter binary for current platform
-build:
-	CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
+build: build-snapshot
+	CGO_ENABLED=1 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
 
 
 pkg/collector/snapshot.o: pkg/collector/c/snapshot.c
@@ -28,45 +32,36 @@ pkg/collector/libsnapshot.a: pkg/collector/snapshot.o
 	ar rcs pkg/collector/libsnapshot.a pkg/collector/snapshot.o
 
 build-snapshot: pkg/collector/libsnapshot.a
-	cp $(FAIRCOMDB_DIR)/lib/libmtclient.so pkg/collector/libmtclient.so
 	
 
 ## build-linux-amd64: Build for Linux AMD64
 build-linux-amd64: build-snapshot
 	mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/exporter
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
 
 ## build-linux-arm64: Build for Linux ARM64
 build-linux-arm64: build-snapshot
 	mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/exporter
+	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build $(DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
 
 ## package-tar: Create tar.gz packages for Linux
-package-tar: build-linux-amd64 build-linux-arm64
+package-tar: build
 	mkdir -p $(OUTPUT_DIR)/tar
-	# AMD64 package
-	mkdir -p $(OUTPUT_DIR)/tar/tmp-amd64/$(PACKAGE_NAME)-linux-amd64
-	cp $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 $(OUTPUT_DIR)/tar/tmp-amd64/$(PACKAGE_NAME)-linux-amd64/$(BINARY_NAME)
-	cp config.yaml $(OUTPUT_DIR)/tar/tmp-amd64/$(PACKAGE_NAME)-linux-amd64/
-	cp README.md $(OUTPUT_DIR)/tar/tmp-amd64/$(PACKAGE_NAME)-linux-amd64/
-	tar -czf $(OUTPUT_DIR)/tar/$(PACKAGE_NAME)-linux-amd64.tar.gz -C $(OUTPUT_DIR)/tar/tmp-amd64 $(PACKAGE_NAME)-linux-amd64
-	rm -rf $(OUTPUT_DIR)/tar/tmp-amd64
-	# ARM64 package
-	mkdir -p $(OUTPUT_DIR)/tar/tmp-arm64/$(PACKAGE_NAME)-linux-arm64
-	cp $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 $(OUTPUT_DIR)/tar/tmp-arm64/$(PACKAGE_NAME)-linux-arm64/$(BINARY_NAME)
-	cp config.yaml $(OUTPUT_DIR)/tar/tmp-arm64/$(PACKAGE_NAME)-linux-arm64/
-	cp README.md $(OUTPUT_DIR)/tar/tmp-arm64/$(PACKAGE_NAME)-linux-arm64/
-	tar -czf $(OUTPUT_DIR)/tar/$(PACKAGE_NAME)-linux-arm64.tar.gz -C $(OUTPUT_DIR)/tar/tmp-arm64 $(PACKAGE_NAME)-linux-arm64
-	rm -rf $(OUTPUT_DIR)/tar/tmp-arm64
+	mkdir -p $(OUTPUT_DIR)/tar/tmp
+	mkdir -p $(OUTPUT_DIR)/tar/tmp/$(PACKAGE_NAME)
+	cp $(OUTPUT_DIR)/$(BINARY_NAME) $(OUTPUT_DIR)/tar/tmp/$(PACKAGE_NAME)/$(BINARY_NAME)
+	cp config.yaml $(OUTPUT_DIR)/tar/tmp/$(PACKAGE_NAME)/
+	cp README.md $(OUTPUT_DIR)/tar/tmp/$(PACKAGE_NAME)/
+	tar -czf $(OUTPUT_DIR)/tar/$(PACKAGE_NAME).tar.gz -C $(OUTPUT_DIR)/tar/tmp $(PACKAGE_NAME)
+	rm -rf $(OUTPUT_DIR)/tar/tmp
 	@echo "Tar packages created in $(OUTPUT_DIR)/tar/"
 
 ## package-deb: Create DEB packages for Debian/Ubuntu
-package-deb: build-linux-amd64 build-linux-arm64
+package-deb: build
 	@which fpm > /dev/null || (echo "ERROR: fpm not found. Install with: gem install fpm" && exit 1)
 	mkdir -p $(OUTPUT_DIR)/deb
-	# AMD64 package
 	fpm -s dir -t deb -n $(BINARY_NAME) -v $(VERSION) \
-		-a amd64 \
+		-a $(BUILD_ARCH) \
 		--description "Prometheus exporter for FairCom database metrics" \
 		--url "https://github.com/faircom/prometheus-exporter" \
 		--license "MIT" \
@@ -74,55 +69,28 @@ package-deb: build-linux-amd64 build-linux-arm64
 		--deb-systemd systemd/$(BINARY_NAME).service \
 		--config-files /etc/$(BINARY_NAME)/config.yaml \
 		--directories /etc/$(BINARY_NAME) \
-		--package $(OUTPUT_DIR)/deb/$(PACKAGE_NAME)-amd64.deb \
-		$(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64=/usr/local/bin/$(BINARY_NAME) \
+		--package $(OUTPUT_DIR)/deb/$(PACKAGE_NAME).deb \
+		$(OUTPUT_DIR)/$(BINARY_NAME)=/usr/local/bin/$(BINARY_NAME) \
 		config.yaml=/etc/$(BINARY_NAME)/config.yaml
-	# ARM64 package
-	fpm -s dir -t deb -n $(BINARY_NAME) -v $(VERSION) \
-		-a arm64 \
-		--description "Prometheus exporter for FairCom database metrics" \
-		--url "https://github.com/faircom/prometheus-exporter" \
-		--license "MIT" \
-		--maintainer "FairCom" \
-		--deb-systemd systemd/$(BINARY_NAME).service \
-		--config-files /etc/$(BINARY_NAME)/config.yaml \
-		--directories /etc/$(BINARY_NAME) \
-		--package $(OUTPUT_DIR)/deb/$(PACKAGE_NAME)-arm64.deb \
-		$(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64=/usr/local/bin/$(BINARY_NAME) \
-		config.yaml=/etc/$(BINARY_NAME)/config.yaml
-	@echo "DEB packages created in $(OUTPUT_DIR)/deb/"
+	@echo "DEB package created in $(OUTPUT_DIR)/deb/"
 
-## package-rpm: Create RPM packages for RHEL/CentOS
-package-rpm: build-linux-amd64 build-linux-arm64
+## package-rpm: Create RPM package for RHEL/CentOS
+package-rpm: build
 	@which fpm > /dev/null || (echo "ERROR: fpm not found. Install with: gem install fpm" && exit 1)
 	mkdir -p $(OUTPUT_DIR)/rpm
-	# AMD64 package
 	fpm -s dir -t rpm -n $(BINARY_NAME) -v $(VERSION) \
-		-a x86_64 \
+		-a $(BUILD_ARCH) \
 		--description "Prometheus exporter for FairCom database metrics" \
 		--url "https://github.com/faircom/prometheus-exporter" \
 		--license "MIT" \
 		--maintainer "FairCom" \
 		--config-files /etc/$(BINARY_NAME)/config.yaml \
 		--directories /etc/$(BINARY_NAME) \
-		--package $(OUTPUT_DIR)/rpm/$(PACKAGE_NAME)-amd64.rpm \
-		$(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64=/usr/local/bin/$(BINARY_NAME) \
+		--package $(OUTPUT_DIR)/rpm/$(PACKAGE_NAME).rpm \
+		$(OUTPUT_DIR)/$(BINARY_NAME)=/usr/local/bin/$(BINARY_NAME) \
 		config.yaml=/etc/$(BINARY_NAME)/config.yaml \
 		systemd/$(BINARY_NAME).service=/usr/lib/systemd/system/$(BINARY_NAME).service
-	# ARM64 package
-	fpm -s dir -t rpm -n $(BINARY_NAME) -v $(VERSION) \
-		-a aarch64 \
-		--description "Prometheus exporter for FairCom database metrics" \
-		--url "https://github.com/faircom/prometheus-exporter" \
-		--license "MIT" \
-		--maintainer "FairCom" \
-		--config-files /etc/$(BINARY_NAME)/config.yaml \
-		--directories /etc/$(BINARY_NAME) \
-		--package $(OUTPUT_DIR)/rpm/$(PACKAGE_NAME)-arm64.rpm \
-		$(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64=/usr/local/bin/$(BINARY_NAME) \
-		config.yaml=/etc/$(BINARY_NAME)/config.yaml \
-		systemd/$(BINARY_NAME).service=/usr/lib/systemd/system/$(BINARY_NAME).service
-	@echo "RPM packages created in $(OUTPUT_DIR)/rpm/"
+	@echo "RPM package created in $(OUTPUT_DIR)/rpm/"
 
 ## package-all: Create all packages (tar.gz, deb, rpm)
 package-all: package-tar package-deb package-rpm
@@ -156,15 +124,6 @@ clean:
 ## install: Install the exporter
 install:
 	go install $(LDFLAGS) ./cmd/exporter
-
-## build-all: Build for all platforms
-build-all:
-	mkdir -p $(OUTPUT_DIR)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/exporter
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/exporter
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/exporter
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/exporter
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/exporter
 
 ## lint: Run golangci-lint
 lint:
