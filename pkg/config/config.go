@@ -46,7 +46,7 @@ type FairComConfig struct {
 type CollectorsConfig struct {
 	Cache        bool `yaml:"cache"`
 	Transactions bool `yaml:"transactions"`
-	CallTime     bool `yaml:"call_timing"`
+	CallTime     bool `yaml:"call_time"`
 	Locks        bool `yaml:"locks"`
 	Files        bool `yaml:"files"`
 	IO           bool `yaml:"io"`

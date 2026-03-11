@@ -87,13 +87,13 @@ test-coverage:
 ## clean: Clean build artifacts
 clean:
 	if EXIST $(OUTPUT_DIR) rd /s/q $(OUTPUT_DIR)
-	del goerr.txt
-	del pkg\collector\*.obj
-	del pkg\collector\*.exp
-	del pkg\collector\*.lib
-	del pkg\collector\*.pdb
-	del pkg\collector\*.ilk
-	del coverage.out coverage.html
+	IF EXIST goerr.txt del goerr.txt
+	IF EXIST pkg\collector\*.obj del pkg\collector\*.obj
+	IF EXIST pkg\collector\*.exp del pkg\collector\*.exp
+	IF EXIST pkg\collector\*.lib del pkg\collector\*.lib
+	IF EXIST pkg\collector\*.pdb del pkg\collector\*.pdb
+	IF EXIST pkg\collector\*.ilk del pkg\collector\*.ilk
+	IF EXIST coverage.* del coverage.out coverage.html
 	go clean
 
 ## install: Install the exporter

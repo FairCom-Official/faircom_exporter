@@ -147,9 +147,17 @@ int GetSnapshotData(struct SnapshotDataC* data, size_t datasize)
 	data->TranLogWriteBytes = (uint64_t)ServerStats.sctwlgbyt;
 
 	data->CtreeCallCount = (uint64_t)ServerStats.scttot_call;
-	data->CtreeCallTime = (uint64_t)ServerStats.scttot_work / ServerStats.scthrtimbas;
-	data->CommIdleTime = (uint64_t)ServerStats.scttot_recv  / ServerStats.scthrtimbas;
-	data->CommSendTime = (uint64_t)ServerStats.scttot_send  / ServerStats.scthrtimbas;
+	if(ServerStats.scthrtimbas) {
+		data->CtreeCallTime = (uint64_t)ServerStats.scttot_work / ServerStats.scthrtimbas;
+		data->CommIdleTime = (uint64_t)ServerStats.scttot_recv  / ServerStats.scthrtimbas;
+		data->CommSendTime = (uint64_t)ServerStats.scttot_send  / ServerStats.scthrtimbas;
+		data->TotalTransactionTime = (uint64_t)ServerStats.scttrntim / ServerStats.scthrtimbas;
+	} else {
+		data->CtreeCallTime = 0;
+		data->CommIdleTime = 0;
+		data->CommSendTime = 0;
+		data->TotalTransactionTime = 0;
+	}
 
 
 
@@ -161,7 +169,6 @@ int GetSnapshotData(struct SnapshotDataC* data, size_t datasize)
 	data->TranRestores = (uint64_t)ServerStats.sct_trrst;
 	data->TranLogFlush= (uint64_t)ServerStats.sct_trfls;
 	data->TotalTransactions = (uint64_t)ServerStats.scttrncnt;
-	data->TotalTransactionTime = (uint64_t)ServerStats.scttrntim / ServerStats.scthrtimbas;
 
 	data->CurrentSystemFilesOpen = (uint64_t)ServerStats.sctactfil;
 	data->MaxSystemFilesOpen = (uint64_t)ServerStats.sctactfilx;

@@ -35,7 +35,6 @@ collectors:
   locks: true
   files: true
   isam: true
-  sql: true
   users: true
   io: true
   # call time requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB server configuration (in ctsrvr.cfg)

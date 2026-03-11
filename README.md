@@ -466,7 +466,7 @@ makewin package-zip
 
 **libmtclient.so not found:**
 - Ensure libmtclient.so binary is available at the expected path (`/usr/lib64/faircom/`)
-- Check executable permissions: `chmod +x /usr/lib64/faircom/libmclient.so`
+- Check executable permissions: `chmod +x /usr/lib64/faircom/libmtclient.so`
 - Verify FairCom SDK is properly installed
 
 **Connection refused:**
