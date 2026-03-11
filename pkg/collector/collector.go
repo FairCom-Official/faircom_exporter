@@ -45,7 +45,13 @@ func (c *FairComCollector) Collect(ch chan<- prometheus.Metric) {
 	c.mutex.Lock()
 	if c.isConnected == false {
 		// try to connect
-		tid, err = initSnapshot(c.config.Servername, c.config.BasicAuth.Username, c.config.BasicAuth.Password, c.config.TLS.CertFile, c.config.TLS.KeyFile, "", c.config.TLS.CAFile)
+		var certFile, keyFile, caFile string
+		if c.config.TLS.Enabled {
+			certFile = c.config.TLS.CertFile
+			keyFile = c.config.TLS.KeyFile
+			caFile = c.config.TLS.CAFile
+		}
+		tid, err = initSnapshot(c.config.Servername, c.config.BasicAuth.Username, c.config.BasicAuth.Password, certFile, keyFile, "", caFile)
 		if tid == 0 && err != nil {
 			c.mutex.Unlock()
 			c.logger.Errorf("Failed to initialize snapshot: %v", err)
@@ -237,7 +243,7 @@ func (c *FairComCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue, float64(snapshot.CurrentFilesOpen))
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc("faircom_files_open_max", "Maximum files open", nil, nil),
-			prometheus.CounterValue, float64(snapshot.MaxSystemFilesOpen))
+			prometheus.CounterValue, float64(snapshot.MaxFilesOpen))
 
 		// File operation metrics
 		ch <- prometheus.MustNewConstMetric(

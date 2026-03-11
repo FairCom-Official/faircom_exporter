@@ -392,7 +392,7 @@ faircom_cache_miss{type="data"} 3364
 
 # Transaction throughput
 faircom_transaction_commits_total 1036
-faircom_transaction_begins_total1036
+faircom_transaction_begins_total 1036
 
 # Lock contention
 faircom_lock_hit_total 9180

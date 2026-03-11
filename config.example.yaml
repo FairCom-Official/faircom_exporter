@@ -51,7 +51,7 @@ faircom:
 # ============================================================================
 # Enable or disable specific metric collectors
 # Most collectors are enabled by default
-# call_timings is disabled, as it requires additional Server side change to enable.
+# call_time is disabled, as it requires additional Server side change to enable.
 collectors:
   # Cache hit/miss counters (4 metrics)
   cache: true
@@ -75,7 +75,7 @@ collectors:
   users: true
 
   # call timings for isam ipc calls. (4 metrics) Requires server configuration DIAGNOSTICS SNAPSHOT_WORKTIME in ctsrvr.cfg:
-  call_timing: true
+  call_time: true
 
 # ============================================================================
 # Logging Configuration

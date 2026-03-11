@@ -4,6 +4,7 @@ VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "1.0.0
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_SHA=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_ARCH=$(shell uname -m)
+BUILD_ARCH_ALT=$(shell [ $(BUILD_ARCH) = "x86_64" ] && echo "amd64" || ([ "$(BUILD_ARCH)" = "aarch64" ] && echo "arm64" || echo "unknown"))
 BINARY_BASENAME=faircom_exporter
 BINARY_NAME=$(BINARY_BASENAME)
 LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.CommitSHA=$(COMMIT_SHA)"
@@ -21,6 +22,7 @@ help:
 
 ## build: Build the exporter binary for current platform
 build: build-snapshot
+	mkdir -p $(OUTPUT_DIR)
 	CGO_ENABLED=1 go build $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME) ./cmd/exporter
 
 
@@ -60,7 +62,7 @@ package-deb: build
 	@which fpm > /dev/null || (echo "ERROR: fpm not found. Install with: gem install fpm" && exit 1)
 	mkdir -p $(OUTPUT_DIR)/deb
 	fpm -s dir -t deb -n $(BINARY_NAME) -v $(VERSION) \
-		-a $(BUILD_ARCH) \
+		-a $(BUILD_ARCH_ALT) \
 		--description "Prometheus exporter for FairCom database metrics" \
 		--url "https://github.com/faircom/prometheus-exporter" \
 		--license "MIT" \

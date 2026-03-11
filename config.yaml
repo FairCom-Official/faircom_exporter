@@ -38,8 +38,8 @@ collectors:
   sql: true
   users: true
   io: true
-  # call timing requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB server configuration (in ctsrvr.cfg)
-  call_timing: false
+  # call time requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB server configuration (in ctsrvr.cfg)
+  call_time: false
 
 
 # Logging configuration
