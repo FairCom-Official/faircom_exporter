@@ -1,6 +1,6 @@
 # Server configuration
 server:
-  port: 9100
+  port: 9101
   path: /metrics
   # TLS configuration (optional)
   # tls:
@@ -14,12 +14,19 @@ server:
 
 # FairCom database connection
 faircom:
-  username: ADMIN
-  password: ADMIN
-  # Path to ctstat binary (default: /opt/faircom/ctstat)
-  ctstat_path: /opt/faircom/ctstat
-  # Command timeout in seconds (default: 10)
-  timeout: 10
+  servername: FAIRCOMS@localhost
+  basic_auth:
+      username: ADMIN
+      password: ADMIN
+
+  # clientside TLS configuration (optional, recommended for production)
+  tls:
+    enabled: false
+    ca_file: /etc/faircom_exporter/tls/ca.crt
+  # client certificate authentication (optional, replaces username & password)
+    #cert_file: /etc/faircom_exporter/tls/user.crt
+    #key_file: /etc/faircom_exporter/tls/user.key
+    
 
 # Collector configuration
 collectors:
@@ -28,8 +35,11 @@ collectors:
   locks: true
   files: true
   isam: true
-  sql: true
   users: true
+  io: true
+  # call time requires DIAGNOSTICS SNAPSHOT_WORKTIME enabled by faircomDB server configuration (in ctsrvr.cfg)
+  call_time: false
+
 
 # Logging configuration
 log:

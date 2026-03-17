@@ -1,0 +1,4 @@
+EXPORTS
+InitSnapshot
+GetSnapshotData
+TermSnapshot

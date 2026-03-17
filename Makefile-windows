@@ -1,0 +1,119 @@
+.PHONY: build-windows-amd64
+
+BINARY_NAME=faircom_exporter
+
+# following values should be set by caller
+BUILD_TIME="undefined"
+VERSION="1.0.0"
+COMMIT_SHA="unknown"
+
+# Need bash escape for double quotes to be passed to go.exe
+LDFLAGS=-ldflags \"-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.CommitSHA=$(COMMIT_SHA)\"
+
+# Need bash escape for double quotes to be passed to go.exe
+#GO_DEBUGFLAGS=-gcflags=all=\"-N -^\"
+OUTPUT_DIR=output
+
+FAIRCOMDB_DIR=c:\faircom\FairCom-DB.windows.64bit.v13.0.0.159\drivers\ctree.drivers
+
+PACKAGE_NAME=$(BINARY_NAME)-$(VERSION)
+
+# The MINGW64 command changes the current shell to bash (using mingw w/ ucrt64) and is useful for manually running the go command for debugging build issues
+# CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o output/faircom_exporter-windows-amd64 ./cmd/exporter
+MINGW64=c:\msys64\msys2_shell.cmd -defterm -here -no-start -ucrt64 -use-full-path
+
+# ucrt64 from MINGW64 
+# see https://www.mingw-w64.org/getting-started/msys2/
+UCRT64=c:\msys64\ucrt64.exe
+RUN_UCRT64=$(UCRT64) /bin/bash -c
+#RUN_UCRT64=$(MINGW64)
+
+checkenv:
+	@IF NOT EXIST $(OUTPUT_DIR) md $(OUTPUT_DIR)
+	@IF NOT EXIST $(FAIRCOMDB_DIR)\lib\mtclient.lib echo mtclient.lib not found. Check FAIRCOMDB_DIR in Makefile-windows && exit 1
+	@IF NOT EXIST $(UCRT64) echo $(UCRT64) not found. Part of the minGW project and required for cgo. && exit 1
+	@where go.exe >nul
+	@IF ERRORLEVEL 1 echo go.exe not found.  The go compiler must be in your PATH. && exit 1
+	@where cl.exe >nul
+	@IF ERRORLEVEL 1 echo visual studio not found. The x64 visual studio compiler must be in your PATH. && exit 1
+
+
+# snapshot.c is compiled using visual studio, as ctree doesn't support gcc for windows.  The resulting dll should be usable with the mingw gcc linker
+$(OUTPUT_DIR)\snapshot.dll: pkg\collector\c\snapshot.c
+	cl /MD /LD /Zi /Ox /I$(FAIRCOMDB_DIR)\include pkg\collector\c\snapshot.c /link /DLL /DEBUG /PDB:pkg\collector\snapshot.pdb /IMPLIB:pkg\collector\snapshot.lib /ILK:pkg\collector\snapshot.ilk /DEF:pkg\collector\c\snapshot.def /OUT:$(OUTPUT_DIR)\snapshot.dll $(FAIRCOMDB_DIR)\lib\mtclient.lib user32.lib advapi32.lib ws2_32.lib
+
+build-snapshot: $(OUTPUT_DIR)\snapshot.dll
+
+
+## build-windows-mingw-amd64: Build for Windows AMD64 - invokes gcc mingw environment setup like $(MINGW64) above
+build-windows-mingw-amd64:
+	@xcopy /Y $(FAIRCOMDB_DIR)\lib\mtclient.lib pkg\collector
+	@xcopy /Y $(FAIRCOMDB_DIR)\lib\mtclient.dll $(OUTPUT_DIR)
+	@SET MSYS2_PATH_TYPE=inherit
+	$(RUN_UCRT64) "CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build $(GO_DEBUGFLAGS) $(LDFLAGS) -o $(OUTPUT_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/exporter 2>goerr.txt"
+
+
+## build-windows: Build for Windows
+build-windows-amd64:  checkenv build-snapshot build-windows-mingw-amd64
+
+## package-zip: Create zip packages for windows
+package-zip:
+	@IF EXIST $(OUTPUT_DIR)\zip rd /s/q $(OUTPUT_DIR)\zip
+	md $(OUTPUT_DIR)\zip
+	md $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64
+	xcopy $(OUTPUT_DIR)\* $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64
+	@IF EXIST $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64\mtclient.dll del /q $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64\mtclient.dll
+	xcopy config.yaml $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64
+	xcopy README.md $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64
+	cd $(OUTPUT_DIR)\zip
+	7z a $(PACKAGE_NAME)-windows-amd64.zip $(PACKAGE_NAME)-windows-amd64
+	cd ..\..
+	rd /s/q $(OUTPUT_DIR)\zip\$(PACKAGE_NAME)-windows-amd64
+	@echo zip package created in $(OUTPUT_DIR)\zip\
+
+## run: Build and run the exporter
+run: build-windows-amd64
+	$(OUTPUT_DIR)\$(BINARY_NAME) --config config.yaml
+
+## test: Run tests
+test:
+	go test -v -race .\...
+
+## test-coverage: Run tests with coverage
+test-coverage:
+	go test -v -race -coverprofile=coverage.out .\...
+	go tool cover -html=coverage.out -o coverage.html
+
+## clean: Clean build artifacts
+clean:
+	if EXIST $(OUTPUT_DIR) rd /s/q $(OUTPUT_DIR)
+	IF EXIST goerr.txt del goerr.txt
+	IF EXIST pkg\collector\*.obj del pkg\collector\*.obj
+	IF EXIST pkg\collector\*.exp del pkg\collector\*.exp
+	IF EXIST pkg\collector\*.lib del pkg\collector\*.lib
+	IF EXIST pkg\collector\*.pdb del pkg\collector\*.pdb
+	IF EXIST pkg\collector\*.ilk del pkg\collector\*.ilk
+	IF EXIST coverage.* del coverage.out coverage.html
+	go clean
+
+## install: Install the exporter
+install:
+	go install $(LDFLAGS) cmd\exporter
+
+## fmt: Format code
+fmt:
+	gofmt -w -s .
+
+## vet: Run go vet
+vet:
+	go vet .\...
+
+## check: Run all checks (fmt, vet)
+check: fmt vet
+	@echo "All checks passed!"
+
+## deps: Download and tidy dependencies
+deps:
+	go mod download
+	go mod tidy
+
