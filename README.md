@@ -53,19 +53,9 @@ Prometheus exporter for FairCom database that collects comprehensive performance
 
 ## Quick Start
 
-### Building from Source
-
-```bash
-# Build for Linux ARM64
-GOOS=linux GOARCH=arm64 go build -o faircom_exporter ./cmd/exporter
-
-# Build for Linux AMD64
-GOOS=linux GOARCH=amd64 go build -o faircom_exporter ./cmd/exporter
-
-# Or use Makefile
-make build-linux-arm64
-make build-linux-amd64
-```
+Prebuilt packages for Linux (amd64/arm64) and Windows are available on the
+[Releases](https://github.com/FairCom-Official/faircom_exporter/releases) page.
+For most users, downloading a prebuilt package is the fastest way to get started.
 
 ### Basic Configuration
 
@@ -95,10 +85,12 @@ curl http://localhost:9100/metrics | grep "^faircom_"
 
 ### Using Package Managers
 
+Download the latest packages from the [Releases](https://github.com/FairCom-Official/faircom_exporter/releases) page.
+
 **Debian/Ubuntu (DEB):**
 ```bash
 # Install package
-sudo dpkg -i faircom_exporter-1.0.0-amd64.deb   # or arm64
+sudo dpkg -i faircom_exporter-v1.1.0-amd64.deb   # or arm64
 
 # Create faircom user (if needed)
 sudo useradd -r -s /bin/false faircom
@@ -114,7 +106,7 @@ sudo systemctl status faircom_exporter
 **RHEL/CentOS/Fedora (RPM):**
 ```bash
 # Install package
-sudo rpm -i faircom_exporter-1.0.0-amd64.rpm    # or aarch64
+sudo rpm -i faircom_exporter-v1.1.0-amd64.rpm    # or arm64
 
 # Create faircom user (if needed)
 sudo useradd -r -s /bin/false faircom
@@ -130,8 +122,8 @@ sudo systemctl status faircom_exporter
 **Manual Installation (tar.gz):**
 ```bash
 # Extract
-tar -xzf faircom_exporter-1.0.0-linux-amd64.tar.gz
-cd faircom_exporter-1.0.0-linux-amd64
+tar -xzf faircom_exporter-v1.1.0-linux-amd64.tar.gz
+cd faircom_exporter-v1.1.0-linux-amd64
 
 # Copy files
 sudo cp faircom_exporter /usr/local/bin/
@@ -149,26 +141,60 @@ sudo systemctl enable faircom_exporter
 sudo systemctl start faircom_exporter
 ```
 
-## Building Packages
+## Building from Source
+
+Building from source requires the FairCom Edge SDK, which provides the C headers and `libmtclient` client library used by the exporter's cgo interface.
+
+### Prerequisites
+
+1. **Go 1.24+** — [golang.org/dl](https://go.dev/dl/)
+2. **GCC** — C compiler for cgo (`gcc` on Linux, MinGW on Windows)
+3. **FairCom Edge SDK** — Download from [faircom.com/products/download-edge](https://www.faircom.com/products/download-edge)
+4. **fpm** (optional) — For building DEB/RPM packages: `gem install fpm`
+
+### Linux
+
+Install the FairCom Edge SDK and note the installation path. The Makefile expects the SDK at `/opt/faircom/drivers/ctree.drivers`. If your SDK is installed elsewhere, set the `FAIRCOMDB_DIR` variable.
 
 ```bash
+# Clone the repository
+git clone https://github.com/FairCom-Official/faircom_exporter.git
+cd faircom_exporter
 
-# Build individually
-make package-tar    # Creates tar.gz archives
-make package-deb    # Creates Debian packages
-make package-rpm    # Creates RPM packages
+# Build for the current platform
+make build
+
+# Or specify the SDK path if not at the default location
+make build FAIRCOMDB_DIR=/path/to/your/sdk/drivers/ctree.drivers
+
+# Build packages (requires fpm)
+make package-deb
+make package-rpm
+make package-tar
+
+# Build all packages at once
+make package-all
 ```
 
 Packages are created in the `output/` directory:
-- `output/tar/` - Compressed archives with binary, config, and README
-- `output/deb/` - Debian packages with systemd integration
-- `output/rpm/` - RPM packages with systemd integration
+- `output/deb/` — Debian packages with systemd integration
+- `output/rpm/` — RPM packages with systemd integration
+- `output/tar/` — Compressed archives with binary, config, and README
 
-```cmd.exe (Windows)
-# Windows builds require both visual studio and gcc (mingw)
-# 1. Install gcc from the instructions at:  https://www.mingw-w64.org/getting-started/msys2/
-# 2. Check the FAIRCOMDB_DIR and UCRT64 values in Makefile-windows and update as needed.
-# 3. From a visual studio x64 command environment, run makewin.bat
+### Windows
+
+Windows builds require both Visual Studio (for MSVC `cl.exe`) and MinGW (for cgo).
+
+1. Install the FairCom Edge SDK for Windows
+2. Install [MSYS2](https://www.msys2.org/) and the UCRT64 toolchain:
+   ```
+   pacman -S mingw-w64-ucrt-x86_64-gcc
+   ```
+3. Edit `Makefile-windows` and set `FAIRCOMDB_DIR` to your SDK path
+4. From a **Visual Studio x64 Native Tools Command Prompt**:
+   ```cmd
+   makewin.bat
+   ```
 
 ## Configuration
 
@@ -299,13 +325,16 @@ See [config.example.yaml](config.example.yaml) for a complete annotated example.
 
 ## Requirements
 
-- **FairCom Server**: FairCom database
-- **libmtclient.so**: FairCom client library must be accessible 
-- **Go**: 1.24+ for building from source
-- **Faircom SDK** for building from source
-- **MSYS2 UCRT64** gcc environment for building cgo from source on windows
-- **Credentials**: FairCom admin username and password
-- **Log Directory**: Write access to `/var/log/faircom_exporter/` (auto-created by systemd)
+**Runtime:**
+- **FairCom Edge Server** — The database server to monitor
+- **libmtclient** — FairCom client library (included in prebuilt packages; bundled with the [FairCom Edge SDK](https://www.faircom.com/products/download-edge) for source builds)
+- **Credentials** — FairCom admin username and password
+
+**Build from source (optional):**
+- **Go 1.24+**
+- **GCC** (Linux) or **MSVC + MinGW** (Windows)
+- **FairCom Edge SDK** — Download from [faircom.com/products/download-edge](https://www.faircom.com/products/download-edge)
+- **fpm** — For DEB/RPM packaging (`gem install fpm`)
 
 ## Architecture
 
@@ -415,17 +444,19 @@ faircom_file_opens_total 4310
 ├── cmd/exporter/          # Application entry point
 ├── pkg/
 │   ├── collector/         # Metrics collection logic
-|   |   |-- c/            # cgo c interface
-│   └── config/           # Configuration handling
-├── systemd/              # Systemd service file
-├── output/               # Build artifacts (gitignored)
+│   │   └── c/             # cgo C interface (snapshot.c, ctreep.h wrapper)
+│   └── config/            # Configuration handling
+├── systemd/               # Systemd service file
+├── build/                 # Build scripts and Dockerfiles (gitignored)
+├── output/                # Build artifacts (gitignored)
 │   ├── deb/
 │   ├── rpm/
-│   └── tar/
-|   |-- zip/
-├── config.yaml           # Example configuration
-├── config.example.yaml   # Complete annotated example
-├── Makefile             # Build automation
+│   ├── tar/
+│   └── msi/
+├── config.yaml            # Default configuration
+├── config.example.yaml    # Complete annotated example
+├── Makefile               # Linux build automation
+├── Makefile-windows       # Windows build automation
 └── README.md
 ```
 
@@ -438,28 +469,16 @@ make clean
 # Build for current platform
 make build
 
-# Build for all platforms
-make build-all
-
 # Run tests
 make test
 
-# Format code
-make fmt
-
-# Run all checks
-make check
+# Build all packages (deb, rpm, tar.gz)
+make package-all
 ```
 
-```cmd.exe
-# Clean build artifacts
-makewin clean
-
-# Build for x64
-makewin
-
-# Build zip package
-makewin package-zip
+```cmd
+:: Windows (from VS x64 Native Tools Command Prompt)
+makewin.bat
 ```
 
 ## Troubleshooting
