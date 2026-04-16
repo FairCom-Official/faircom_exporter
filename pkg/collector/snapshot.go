@@ -73,6 +73,13 @@ type SnapshotData struct {
 	FileRenames      uint64
 	FileDeletes      uint64
 	TotalMemory      uint64
+
+	SQLSelect uint64
+	SQLInsert uint64
+	SQLUpdate uint64
+	SQLDelete uint64
+	SQLCommit uint64
+	SQLRollback uint64
 }
 
 // initSnapshot initializes the faircomDB connection by calling the C function. Returns 0 on error, or owner on success
@@ -191,6 +198,13 @@ func GetSnapshot(owner int) (*SnapshotData, error) {
 	data.FileRenames = uint64(Cdata.FileRenames)
 	data.FileDeletes = uint64(Cdata.FileDeletes)
 	data.TotalMemory = uint64(Cdata.TotalMemory)
+
+	data.SQLSelect	= uint64(Cdata.SQLSelect)
+	data.SQLInsert = uint64(Cdata.SQLInsert)
+	data.SQLDelete = uint64(Cdata.SQLDelete)
+	data.SQLUpdate = uint64(Cdata.SQLUpdate)
+	data.SQLCommit = uint64(Cdata.SQLCommit)
+	data.SQLRollback = uint64(Cdata.SQLRollback)
 
 	return data, nil
 }

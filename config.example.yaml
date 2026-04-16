@@ -74,6 +74,9 @@ collectors:
   # User connection counts (2 metrics)
   users: true
 
+  # SQL operation metrics: select, insert, update, delete, commit, rollback (6 metrics)
+  sql: true
+
   # call timings for isam ipc calls. (4 metrics) Requires server configuration DIAGNOSTICS SNAPSHOT_WORKTIME in ctsrvr.cfg:
   call_time: true
 
