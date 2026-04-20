@@ -109,11 +109,7 @@ func Load(path string) (*Config, error) {
 
 	// Default collectors to enabled if not specified
 	// CallTime defaults false
-	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions 
-	   && !cfg.Collectors.Locks && !cfg.Collectors.IO 
-	   && !cfg.Collectors.Files && !cfg.Collectors.ISAM 
-	   && !cfg.Collectors.Users && !cfg.Collectors.CallTime 
-	   && !cfg.Collectors.SQL {
+	if !cfg.Collectors.Cache && !cfg.Collectors.Transactions && !cfg.Collectors.Locks && !cfg.Collectors.IO && !cfg.Collectors.Files && !cfg.Collectors.ISAM && !cfg.Collectors.Users && !cfg.Collectors.CallTime && !cfg.Collectors.SQL {
 		cfg.Collectors.Cache = true
 		cfg.Collectors.IO = true
 		cfg.Collectors.Transactions = true

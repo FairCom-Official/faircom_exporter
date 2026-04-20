@@ -222,7 +222,7 @@ func (c *FairComCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue, float64(snapshot.SQLSelect))
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc("faircom_sql_insert_total", "SQL insert operations", nil, nil),
-			prometheus.CounterValue, float64(snapshot.SQLinsert))
+			prometheus.CounterValue, float64(snapshot.SQLInsert))
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc("faircom_sql_delete_total", "SQL delete operations", nil, nil),
 			prometheus.CounterValue, float64(snapshot.SQLDelete))

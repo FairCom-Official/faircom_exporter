@@ -222,7 +222,7 @@ int GetSnapshotData(struct SnapshotDataC* data, size_t datasize)
 
 #if ctSQLSvern > 2
 	/* FairComDB SnapShot API expects a buffer and size */
-	int rc = SnapShot(ctPSSsqlSystem,NULL,&stats.sql, sizeof(stats.sql));
+	rc = SnapShot(ctPSSsqlSystem,NULL,&stats.sql, sizeof(stats.sql));
 	if (rc)
 	{
 		printf("SnapShot(ctPSSsqlSystem) error %d\n", rc);
