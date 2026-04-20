@@ -43,6 +43,9 @@ Prometheus exporter for FairCom database that collects comprehensive performance
 ### ISAM Operations (4 metrics)
 - Record adds/deletes/updates/reads
 
+### SQL Operations (6 metrics)
+- Statement execution (select/insert/update/delete/commit/rollback)
+
 ### User Statistics (2 metrics)
 - current and maximum user counts
 

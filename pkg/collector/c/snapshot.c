@@ -9,8 +9,10 @@ static int isInitialized = 0;
 * @brief Terminate snapshot connection and clean up resources.
 * 
 */
-void TermSnapshot(void) {
-	if (isInitialized) {
+void TermSnapshot(void)
+{
+	if (isInitialized)
+	{
 		STPUSR();
 		ctThrdTerm();
 		isInitialized = 0;
@@ -105,100 +107,136 @@ err_ret:
 	return rc;
 }
 
+/*
+* @brief Collect data FaircomDB using snapshot api.
+* 
+* @param data [OUT] Pointer  struct to be filled with snapshot data. 
+*
+* @param datasize [IN] size of data
+* 
+* @return 0 on success, or a non-zero error code on failure.
+*/
 int GetSnapshotData(struct SnapshotDataC* data, size_t datasize)
 {
-	ctGSMS ServerStats;
+	union
+	{
+		ctGSMS system;
+		ctSQLS sql;
+	} stats;
 
-	if (!isInitialized) {
+	if (!isInitialized)
+	{
 		printf("FaircomDB not initialized.\n");
 		return -1;
 	}
-	if (!data) {
+	if (!data)
+	{
 		printf("Invalid data pointer.\n");
 		return -1;
 	}
-	if (datasize != sizeof(struct SnapshotDataC)) {
+	if (datasize != sizeof(struct SnapshotDataC))
+	{
 		printf("Invalid SnapshotData size: expected %zu, got %zu\n", sizeof(struct SnapshotDataC), datasize);
 		return -1;
 	}
+	memset(&stats, 0, sizeof(stats));
 
 	/* FairComDB SnapShot API expects a buffer and size */
-	int rc = SnapShot(ctPSSsystem,NULL,&ServerStats, sizeof(ServerStats));
-	if (rc) {
+	int rc = SnapShot(ctPSSsystem,NULL,&stats.system, sizeof(stats.system));
+	if (rc)
+	{
 		printf("SnapShot failed: error %d\n", rc);
 		return rc;
 	}
 	/* Map fields from ServerStats to SnapshotData */ 
-	data->DataCacheHit = (uint64_t)ServerStats.sct_dbhit;
-	data->DataCacheMiss = (uint64_t)(ServerStats.sct_dbrqs - ServerStats.sct_dbhit);
-	data->IndexCacheHit = (uint64_t)ServerStats.sct_ibhit;
-	data->IndexCacheMiss = (uint64_t)(ServerStats.sct_ibrqs - ServerStats.sct_ibhit);
-	data->FileReadOps = (uint64_t)ServerStats.sct_rdops;
-	data->FileReadBytes = (uint64_t)ServerStats.sct_rdbyt;
-	data->FileWriteOps = (uint64_t)ServerStats.sct_wrops;
-	data->FileWriteBytes = (uint64_t)ServerStats.sct_wrbyt;
-	data->CommReadOps = (uint64_t)ServerStats.sct_rcops;
-	data->CommReadBytes = (uint64_t)ServerStats.sct_rcbyt;
-	data->CommWriteOps = (uint64_t)ServerStats.sct_wcops;
-	data->CommWriteBytes = (uint64_t)ServerStats.sct_wcbyt;
-	data->TranLogReadOps = (uint64_t)ServerStats.sctrlgops;
-	data->TranLogReadBytes = (uint64_t)ServerStats.sctrlgbyt;
-	data->TranLogWriteOps = (uint64_t)ServerStats.sctwlgops;
-	data->TranLogWriteBytes = (uint64_t)ServerStats.sctwlgbyt;
+	data->DataCacheHit = (uint64_t)stats.system.sct_dbhit;
+	data->DataCacheMiss = (uint64_t)(stats.system.sct_dbrqs - stats.system.sct_dbhit);
+	data->IndexCacheHit = (uint64_t)stats.system.sct_ibhit;
+	data->IndexCacheMiss = (uint64_t)(stats.system.sct_ibrqs - stats.system.sct_ibhit);
+	data->FileReadOps = (uint64_t)stats.system.sct_rdops;
+	data->FileReadBytes = (uint64_t)stats.system.sct_rdbyt;
+	data->FileWriteOps = (uint64_t)stats.system.sct_wrops;
+	data->FileWriteBytes = (uint64_t)stats.system.sct_wrbyt;
+	data->CommReadOps = (uint64_t)stats.system.sct_rcops;
+	data->CommReadBytes = (uint64_t)stats.system.sct_rcbyt;
+	data->CommWriteOps = (uint64_t)stats.system.sct_wcops;
+	data->CommWriteBytes = (uint64_t)stats.system.sct_wcbyt;
+	data->TranLogReadOps = (uint64_t)stats.system.sctrlgops;
+	data->TranLogReadBytes = (uint64_t)stats.system.sctrlgbyt;
+	data->TranLogWriteOps = (uint64_t)stats.system.sctwlgops;
+	data->TranLogWriteBytes = (uint64_t)stats.system.sctwlgbyt;
 
-	data->CtreeCallCount = (uint64_t)ServerStats.scttot_call;
-	if(ServerStats.scthrtimbas) {
-		data->CtreeCallTime = (uint64_t)ServerStats.scttot_work / ServerStats.scthrtimbas;
-		data->CommIdleTime = (uint64_t)ServerStats.scttot_recv  / ServerStats.scthrtimbas;
-		data->CommSendTime = (uint64_t)ServerStats.scttot_send  / ServerStats.scthrtimbas;
-		data->TotalTransactionTime = (uint64_t)ServerStats.scttrntim / ServerStats.scthrtimbas;
-	} else {
+	data->CtreeCallCount = (uint64_t)stats.system.scttot_call;
+	if(stats.system.scthrtimbas) 
+	{
+		data->CtreeCallTime = (uint64_t)stats.system.scttot_work / stats.system.scthrtimbas;
+		data->CommIdleTime = (uint64_t)stats.system.scttot_recv  / stats.system.scthrtimbas;
+		data->CommSendTime = (uint64_t)stats.system.scttot_send  / stats.system.scthrtimbas;
+		data->TotalTransactionTime = (uint64_t)stats.system.scttrntim / stats.system.scthrtimbas;
+	} 
+	else 
+	{
 		data->CtreeCallTime = 0;
 		data->CommIdleTime = 0;
 		data->CommSendTime = 0;
 		data->TotalTransactionTime = 0;
 	}
 
+	data->TranBegins = (uint64_t)stats.system.sct_trbeg;
+	data->TranCommits = (uint64_t)stats.system.sct_trend;
+	data->TranAborts = (uint64_t)stats.system.sct_trabt;
+	data->TranSavepoints = (uint64_t)stats.system.sct_trsav;
+	data->TranRestores = (uint64_t)stats.system.sct_trrst;
+	data->TranLogFlush= (uint64_t)stats.system.sct_trfls;
+	data->TotalTransactions = (uint64_t)stats.system.scttrncnt;
 
+	data->CurrentSystemFilesOpen = (uint64_t)stats.system.sctactfil;
+	data->MaxSystemFilesOpen = (uint64_t)stats.system.sctactfilx;
+	data->CurrentFilesOpen = (uint64_t)stats.system.scttotblk;
+	data->MaxFilesOpen = (uint64_t)stats.system.scttotblkx;
+	data->UsersActive = (uint64_t)stats.system.sctnusers;
+	data->MaxUsersActive = (uint64_t)stats.system.sctnusersx;
 
-
-	data->TranBegins = (uint64_t)ServerStats.sct_trbeg;
-	data->TranCommits = (uint64_t)ServerStats.sct_trend;
-	data->TranAborts = (uint64_t)ServerStats.sct_trabt;
-	data->TranSavepoints = (uint64_t)ServerStats.sct_trsav;
-	data->TranRestores = (uint64_t)ServerStats.sct_trrst;
-	data->TranLogFlush= (uint64_t)ServerStats.sct_trfls;
-	data->TotalTransactions = (uint64_t)ServerStats.scttrncnt;
-
-	data->CurrentSystemFilesOpen = (uint64_t)ServerStats.sctactfil;
-	data->MaxSystemFilesOpen = (uint64_t)ServerStats.sctactfilx;
-	data->CurrentFilesOpen = (uint64_t)ServerStats.scttotblk;
-	data->MaxFilesOpen = (uint64_t)ServerStats.scttotblkx;
-	data->UsersActive = (uint64_t)ServerStats.sctnusers;
-	data->MaxUsersActive = (uint64_t)ServerStats.sctnusersx;
-
-	data->CurrentLocksHeld = (uint64_t)ServerStats.sctlokcur;
-	data->CurrentLockWaits = (uint64_t)ServerStats.sctblkcur;
+	data->CurrentLocksHeld = (uint64_t)stats.system.sctlokcur;
+	data->CurrentLockWaits = (uint64_t)stats.system.sctblkcur;
 	
-	data->LockMiss = (uint64_t)(ServerStats.sctlokdny + ServerStats.sctlokblk);
-	data->LockHit = (uint64_t)(ServerStats.sctloktry - data->LockMiss);
-	data->LockWaits = (uint64_t)ServerStats.sctlokblk;
-	data->Deadlocks = (uint64_t)ServerStats.sctlokdlk;
+	data->LockMiss = (uint64_t)(stats.system.sctlokdny + stats.system.sctlokblk);
+	data->LockHit = (uint64_t)(stats.system.sctloktry - data->LockMiss);
+	data->LockWaits = (uint64_t)stats.system.sctlokblk;
+	data->Deadlocks = (uint64_t)stats.system.sctlokdlk;
 
-	data->IsamAdds = (uint64_t)ServerStats.sctismaddcnt;
-	data->IsamDeletes = (uint64_t)ServerStats.sctismdelcnt;
-	data->IsamUpdates = (uint64_t)ServerStats.sctismupdcnt;
-	data->IsamReads = (uint64_t)ServerStats.sctismredcnt;
+	data->IsamAdds = (uint64_t)stats.system.sctismaddcnt;
+	data->IsamDeletes = (uint64_t)stats.system.sctismdelcnt;
+	data->IsamUpdates = (uint64_t)stats.system.sctismupdcnt;
+	data->IsamReads = (uint64_t)stats.system.sctismredcnt;
 
-	data->SystemFileOpens = (uint64_t)ServerStats.sphyopncnt;
-	data->SystemFileCloses = (uint64_t)ServerStats.sphyclscnt;
-	data->FileOpens = (uint64_t)ServerStats.slogopncnt;
-	data->FileCloses = (uint64_t)ServerStats.slogclscnt;
-	data->FileCreates = (uint64_t)ServerStats.sfilcrecnt;
-	data->FileRenames = (uint64_t)ServerStats.sfilrencnt;
-	data->FileDeletes = (uint64_t)ServerStats.sfildelcnt;
+	data->SystemFileOpens = (uint64_t)stats.system.sphyopncnt;
+	data->SystemFileCloses = (uint64_t)stats.system.sphyclscnt;
+	data->FileOpens = (uint64_t)stats.system.slogopncnt;
+	data->FileCloses = (uint64_t)stats.system.slogclscnt;
+	data->FileCreates = (uint64_t)stats.system.sfilcrecnt;
+	data->FileRenames = (uint64_t)stats.system.sfilrencnt;
+	data->FileDeletes = (uint64_t)stats.system.sfildelcnt;
 
-	data->TotalMemory = (uint64_t)ServerStats.sctmemsum;
+	data->TotalMemory = (uint64_t)stats.system.sctmemsum;
 
+#if ctSQLSvern > 2
+	/* FairComDB SnapShot API expects a buffer and size */
+	rc = SnapShot(ctPSSsqlSystem,NULL,&stats.sql, sizeof(stats.sql));
+	if (rc)
+	{
+		printf("SnapShot(ctPSSsqlSystem) error %d\n", rc);
+		return rc;
+	}
+	if (stats.sql.server_ver > 2)
+	{
+		data->SQLSelect = stats.sql.select;
+		data->SQLInsert = stats.sql.insert;
+		data->SQLUpdate = stats.sql.update;
+		data->SQLDelete = stats.sql.deletes;
+		data->SQLCommit = stats.sql.commit;
+		data->SQLRollback = stats.sql.rollback;
+	}
+#endif
 	return rc;
 }

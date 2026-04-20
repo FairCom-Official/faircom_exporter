@@ -215,6 +215,28 @@ func (c *FairComCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.NewDesc("faircom_isam_reads_total", "ISAM read operations", nil, nil),
 			prometheus.CounterValue, float64(snapshot.IsamReads))
 	}
+	if c.metric.SQL == true {
+		// SQL metrics
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_select_total", "SQL select operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLSelect))
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_insert_total", "SQL insert operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLInsert))
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_delete_total", "SQL delete operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLDelete))
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_update_total", "SQL update operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLUpdate))
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_commit_total", "SQL commit operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLCommit))
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("faircom_sql_rollback_total", "SQL rollback operations", nil, nil),
+			prometheus.CounterValue, float64(snapshot.SQLRollback))
+
+	}
 	if c.metric.CallTime == true {
 		// work timing
 		ch <- prometheus.MustNewConstMetric(

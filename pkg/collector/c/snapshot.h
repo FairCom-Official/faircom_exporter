@@ -62,14 +62,13 @@ struct SnapshotDataC {
     uint64_t FileDeletes;
     uint64_t TotalMemory;
 
-    /* SQL activity. Don't have this- TODO.
-    uint64_t SQLSelects;
-    uint64_t SQLInserts;
-    uint64_t SQLUpdates;
-    uint64_t SQLDeletes;
-    uint64_t SQLCommits;
-    uint64_t SQLRollbacks;
-    */
+    /* SQL activity */
+    uint64_t SQLSelect;
+    uint64_t SQLInsert;
+    uint64_t SQLUpdate;
+    uint64_t SQLDelete;
+    uint64_t SQLCommit;
+    uint64_t SQLRollback;
 };
 
 int InitSnapshot(const char * servername, const char * username, const char * password, const char * clientauthfile, const char * clientkeyfile,const char * passphrase,const char * cafile);
